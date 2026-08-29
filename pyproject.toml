@@ -13,6 +13,9 @@ authors = [
 ]
 dependencies = []
 
+[project.scripts]
+lockoutlens = "lockoutlens.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/pullsec/lockoutlens"
 Repository = "https://github.com/pullsec/lockoutlens"
@@ -20,3 +23,8 @@ Issues = "https://github.com/pullsec/lockoutlens/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
