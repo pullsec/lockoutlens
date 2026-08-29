@@ -6,6 +6,7 @@ import pytest
 from lockoutlens import __version__
 from lockoutlens.cli import build_parser, main, run_policy
 from lockoutlens.ldap.exceptions import LDAPBindError
+from lockoutlens.ldap.exceptions import LDAPError
 
 
 def test_parser_program_name():
@@ -143,6 +144,7 @@ def test_run_policy_reads_and_displays_domain_policy(capsys):
     )
 
     client.bind.assert_called_once_with()
+    connection.unbind.assert_called_once_with()
     client.get_default_naming_context.assert_called_once_with(
         connection
     )
@@ -216,3 +218,37 @@ def test_policy_parser_with_ca_file():
 
     assert args.use_ssl is True
     assert args.ca_file == "/tmp/lab-ca.pem"
+
+def test_run_policy_unbinds_connection_on_ldap_error(capsys):
+    args = argparse.Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
+    )
+
+    connection = MagicMock()
+
+    with (
+        patch(
+            "lockoutlens.cli.getpass",
+            return_value="secret",
+        ),
+        patch(
+            "lockoutlens.cli.LDAPClient",
+        ) as mock_client_class,
+    ):
+        client = mock_client_class.return_value
+        client.bind.return_value = connection
+        client.get_default_naming_context.side_effect = LDAPError(
+            "RootDSE failure"
+        )
+
+        result = run_policy(args)
+
+    assert result == 1
+    connection.unbind.assert_called_once_with()
+
+    output = capsys.readouterr().out
+    assert "Error: RootDSE failure" in output

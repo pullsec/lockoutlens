@@ -82,6 +82,8 @@ def run_policy(args: argparse.Namespace) -> int:
         ca_file=args.ca_file,
     )
 
+    connection = None
+
     try:
         connection = client.bind()
 
@@ -97,6 +99,10 @@ def run_policy(args: argparse.Namespace) -> int:
     except (LDAPBindError, LDAPError) as exc:
         print(f"Error: {exc}")
         return 1
+
+    finally:
+        if connection is not None:
+            connection.unbind()
 
     print(f"Domain:              {args.domain}")
     print(f"Domain Controller:   {args.dc}")
