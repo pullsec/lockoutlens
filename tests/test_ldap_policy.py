@@ -6,8 +6,10 @@ from ldap3 import BASE
 from lockoutlens.ldap.exceptions import LDAPError
 from lockoutlens.ldap.policy import (
     DOMAIN_POLICY_ATTRIBUTES,
+    DomainPolicy,
     ad_interval_to_seconds,
     get_domain_policy,
+    normalize_domain_policy,
 )
 
 def test_get_domain_policy():
@@ -91,3 +93,58 @@ def test_ad_interval_to_seconds(value, expected):
 
 def test_ad_interval_to_seconds_accepts_positive_value():
     assert ad_interval_to_seconds(18_000_000_000) == 1800
+
+def test_normalize_domain_policy():
+    raw_policy = {
+        "minPwdLength": 12,
+        "pwdHistoryLength": 24,
+        "minPwdAge": -864_000_000_000,
+        "maxPwdAge": -36_288_000_000_000,
+        "lockoutThreshold": 5,
+        "lockoutDuration": -18_000_000_000,
+        "lockoutObservationWindow": -18_000_000_000,
+    }
+
+    policy = normalize_domain_policy(raw_policy)
+
+    assert policy == DomainPolicy(
+        min_password_length=12,
+        password_history_length=24,
+        min_password_age_seconds=86400,
+        max_password_age_seconds=3628800,
+        lockout_threshold=5,
+        lockout_duration_seconds=1800,
+        lockout_observation_window_seconds=1800,
+    )
+
+def test_normalize_domain_policy_preserves_zero_lockout_threshold():
+    raw_policy = {
+        "minPwdLength": 12,
+        "pwdHistoryLength": 24,
+        "minPwdAge": 0,
+        "maxPwdAge": 0,
+        "lockoutThreshold": 0,
+        "lockoutDuration": 0,
+        "lockoutObservationWindow": 0,
+    }
+
+    policy = normalize_domain_policy(raw_policy)
+
+    assert policy.lockout_threshold == 0
+    assert policy.lockout_duration_seconds == 0
+    assert policy.lockout_observation_window_seconds == 0
+
+
+def test_domain_policy_is_immutable():
+    policy = DomainPolicy(
+        min_password_length=12,
+        password_history_length=24,
+        min_password_age_seconds=86400,
+        max_password_age_seconds=3628800,
+        lockout_threshold=5,
+        lockout_duration_seconds=1800,
+        lockout_observation_window_seconds=1800,
+    )
+
+    with pytest.raises(AttributeError):
+        policy.lockout_threshold = 10

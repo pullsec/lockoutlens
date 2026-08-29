@@ -1,5 +1,5 @@
 from typing import Any
-
+from dataclasses import dataclass
 from ldap3 import BASE, Connection
 
 from lockoutlens.ldap.exceptions import LDAPError
@@ -17,6 +17,17 @@ DOMAIN_POLICY_ATTRIBUTES = (
 
 AD_TICKS_PER_SECOND = 10_000_000
 
+@dataclass(frozen=True)
+class DomainPolicy:
+    """Normalized Active Directory domain password policy."""
+
+    min_password_length: int
+    password_history_length: int
+    min_password_age_seconds: int | None
+    max_password_age_seconds: int | None
+    lockout_threshold: int
+    lockout_duration_seconds: int | None
+    lockout_observation_window_seconds: int | None
 
 def ad_interval_to_seconds(value: int | None) -> int | None:
     """Convert an Active Directory interval to seconds."""
@@ -24,6 +35,28 @@ def ad_interval_to_seconds(value: int | None) -> int | None:
         return None
 
     return abs(value) // AD_TICKS_PER_SECOND
+
+def normalize_domain_policy(
+    raw_policy: dict[str, Any],
+) -> DomainPolicy:
+    """Normalize raw Active Directory domain policy attributes."""
+    return DomainPolicy(
+        min_password_length=int(raw_policy["minPwdLength"]),
+        password_history_length=int(raw_policy["pwdHistoryLength"]),
+        min_password_age_seconds=ad_interval_to_seconds(
+            raw_policy["minPwdAge"]
+        ),
+        max_password_age_seconds=ad_interval_to_seconds(
+            raw_policy["maxPwdAge"]
+        ),
+        lockout_threshold=int(raw_policy["lockoutThreshold"]),
+        lockout_duration_seconds=ad_interval_to_seconds(
+            raw_policy["lockoutDuration"]
+        ),
+        lockout_observation_window_seconds=ad_interval_to_seconds(
+            raw_policy["lockoutObservationWindow"]
+        ),
+    )
 
 def get_domain_policy(
     connection: Connection,
