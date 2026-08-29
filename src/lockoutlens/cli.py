@@ -3,7 +3,11 @@ from getpass import getpass
 
 from lockoutlens import __version__
 from lockoutlens.ldap.client import LDAPClient
-from lockoutlens.ldap.exceptions import LDAPBindError
+from lockoutlens.ldap.exceptions import LDAPBindError, LDAPError
+from lockoutlens.ldap.policy import (
+    get_domain_policy,
+    normalize_domain_policy,
+)
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -78,14 +82,53 @@ def run_policy(args: argparse.Namespace) -> int:
     )
 
     try:
-        client.bind()
-    except LDAPBindError as exc:
+        connection = client.bind()
+
+        base_dn = client.get_default_naming_context(connection)
+
+        raw_policy = get_domain_policy(
+            connection,
+            base_dn,
+        )
+
+        policy = normalize_domain_policy(raw_policy)
+
+    except (LDAPBindError, LDAPError) as exc:
         print(f"Error: {exc}")
         return 1
 
-    print(f"Connected to {args.dc}")
-    return 0
+    print(f"Domain:              {args.domain}")
+    print(f"Domain Controller:   {args.dc}")
+    print()
+    print("Password Policy")
+    print("-" * 34)
+    print(f"Minimum length:      {policy.min_password_length}")
+    print(
+        f"Password history:    "
+        f"{policy.password_history_length}"
+    )
+    print(
+        f"Minimum age:         "
+        f"{policy.min_password_age_seconds} seconds"
+    )
+    print(
+        f"Maximum age:         "
+        f"{policy.max_password_age_seconds} seconds"
+    )
+    print()
+    print("Lockout Policy")
+    print("-" * 34)
+    print(f"Threshold:           {policy.lockout_threshold}")
+    print(
+        f"Observation window:  "
+        f"{policy.lockout_observation_window_seconds} seconds"
+    )
+    print(
+        f"Lockout duration:    "
+        f"{policy.lockout_duration_seconds} seconds"
+    )
 
+    return 0
 
 def main() -> int:
     parser = build_parser()

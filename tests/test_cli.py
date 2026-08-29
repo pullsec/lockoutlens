@@ -1,11 +1,12 @@
-from argparse import Namespace
+import argparse
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from lockoutlens import __version__
-from lockoutlens.cli import build_parser, run_policy
+from lockoutlens.cli import build_parser, main, run_policy
 from lockoutlens.ldap.exceptions import LDAPBindError
+
 
 def test_parser_program_name():
     parser = build_parser()
@@ -35,6 +36,7 @@ def test_help(capsys):
 
     assert "Active Directory" in output
     assert "--version" in output
+
 
 def test_policy_parser():
     parser = build_parser()
@@ -86,47 +88,82 @@ def test_policy_requires_connection_arguments():
 
     assert exc_info.value.code == 2
 
-def test_run_policy_binds_with_prompted_password():
-    args = Namespace(
+
+def test_run_policy_reads_and_displays_domain_policy(capsys):
+    args = argparse.Namespace(
         dc="dc01.lab.local",
         domain="lab.local",
         username="auditor",
-        use_ssl=False,
-        ca_file=None,
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
     )
 
-    client = MagicMock()
+    connection = MagicMock()
+
+    raw_policy = {
+        "minPwdLength": 12,
+        "pwdHistoryLength": 24,
+        "minPwdAge": -864_000_000_000,
+        "maxPwdAge": -36_288_000_000_000,
+        "lockoutThreshold": 5,
+        "lockoutDuration": -18_000_000_000,
+        "lockoutObservationWindow": -18_000_000_000,
+    }
 
     with (
         patch(
             "lockoutlens.cli.getpass",
             return_value="secret",
-        ) as mock_getpass,
+        ),
         patch(
             "lockoutlens.cli.LDAPClient",
-            return_value=client,
-        ) as mock_client,
+        ) as mock_client_class,
+        patch(
+            "lockoutlens.cli.get_domain_policy",
+            return_value=raw_policy,
+        ) as mock_get_domain_policy,
     ):
+        client = mock_client_class.return_value
+        client.bind.return_value = connection
+        client.get_default_naming_context.return_value = (
+            "DC=lab,DC=local"
+        )
+
         result = run_policy(args)
 
-    mock_getpass.assert_called_once_with("Password: ")
+    assert result == 0
 
-    mock_client.assert_called_once_with(
+    mock_client_class.assert_called_once_with(
         dc="dc01.lab.local",
         domain="lab.local",
         username="auditor",
         password="secret",
-        use_ssl=False,
-        ca_file=None,
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
     )
 
     client.bind.assert_called_once_with()
+    client.get_default_naming_context.assert_called_once_with(
+        connection
+    )
 
-    assert result == 0
+    mock_get_domain_policy.assert_called_once_with(
+        connection,
+        "DC=lab,DC=local",
+    )
+
+    output = capsys.readouterr().out
+
+    assert "Domain:              lab.local" in output
+    assert "Minimum length:      12" in output
+    assert "Password history:    24" in output
+    assert "Threshold:           5" in output
+    assert "Observation window:  1800 seconds" in output
+    assert "Lockout duration:    1800 seconds" in output
 
 
 def test_run_policy_returns_error_on_bind_failure(capsys):
-    args = Namespace(
+    args = argparse.Namespace(
         dc="dc01.lab.local",
         domain="lab.local",
         username="auditor",
@@ -155,6 +192,7 @@ def test_run_policy_returns_error_on_bind_failure(capsys):
 
     assert result == 1
     assert "invalidCredentials" in output
+
 
 def test_policy_parser_with_ca_file():
     parser = build_parser()
