@@ -5,7 +5,7 @@ import ssl
 
 from lockoutlens.ldap.client import LDAPClient
 from lockoutlens.ldap.exceptions import LDAPBindError
-
+from ldap3 import BASE
 
 def test_bind_user_from_short_username():
     client = LDAPClient(
@@ -159,3 +159,69 @@ def test_ldaps_requires_certificate_validation(tmp_path):
     assert server.tls is not None
     assert server.tls.validate == ssl.CERT_REQUIRED
     assert server.tls.ca_certs_file == str(ca_file)
+
+def test_get_default_naming_context():
+    client = LDAPClient(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        password="secret",
+    )
+
+    connection = MagicMock()
+    connection.search.return_value = True
+
+    entry = MagicMock()
+    entry.defaultNamingContext.value = "DC=lab,DC=local"
+    connection.entries = [entry]
+
+    result = client.get_default_naming_context(connection)
+
+    connection.search.assert_called_once_with(
+        search_base="",
+        search_filter="(objectClass=*)",
+        search_scope=BASE,
+        attributes=["defaultNamingContext"],
+    )
+
+    assert result == "DC=lab,DC=local"
+
+def test_get_default_naming_context_raises_when_search_fails():
+    client = LDAPClient(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        password="secret",
+    )
+
+    connection = MagicMock()
+    connection.search.return_value = False
+    connection.entries = []
+
+    with pytest.raises(
+        LDAPBindError,
+        match="Unable to retrieve defaultNamingContext",
+    ):
+        client.get_default_naming_context(connection)
+
+
+def test_get_default_naming_context_raises_when_value_is_missing():
+    client = LDAPClient(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        password="secret",
+    )
+
+    connection = MagicMock()
+    connection.search.return_value = True
+
+    entry = MagicMock()
+    entry.defaultNamingContext.value = None
+    connection.entries = [entry]
+
+    with pytest.raises(
+        LDAPBindError,
+        match="did not return defaultNamingContext",
+    ):
+        client.get_default_naming_context(connection)

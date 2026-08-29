@@ -1,6 +1,6 @@
 import ssl
 
-from ldap3 import Connection, Server, Tls
+from ldap3 import BASE, Connection, Server, Tls
 
 from lockoutlens.ldap.exceptions import LDAPBindError
 
@@ -79,3 +79,29 @@ class LDAPClient:
             raise LDAPBindError(
                 f"Unable to connect to LDAP server {self.dc}: {exc}"
             ) from exc
+
+    def get_default_naming_context(
+        self,
+        connection: Connection,
+    ) -> str:
+        """Return the Active Directory default naming context."""
+        success = connection.search(
+            search_base="",
+            search_filter="(objectClass=*)",
+            search_scope=BASE,
+            attributes=["defaultNamingContext"],
+        )
+
+        if not success or not connection.entries:
+            raise LDAPBindError(
+                "Unable to retrieve defaultNamingContext from RootDSE"
+            )
+
+        value = connection.entries[0].defaultNamingContext.value
+
+        if not value:
+            raise LDAPBindError(
+                "RootDSE did not return defaultNamingContext"
+            )
+
+        return str(value)
