@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import ssl
 
 from lockoutlens.ldap.client import LDAPClient
 from lockoutlens.ldap.exceptions import LDAPBindError
@@ -137,3 +138,24 @@ def test_bind_wraps_connection_error():
             match="Unable to connect",
         ):
             client.bind()
+
+def test_ldaps_requires_certificate_validation(tmp_path):
+    ca_file = tmp_path / "lab-ca.pem"
+    ca_file.write_text("dummy")
+
+    client = LDAPClient(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        password="secret",
+        use_ssl=True,
+        ca_file=str(ca_file),
+    )
+
+    server = client.create_server()
+
+    assert server.ssl is True
+    assert server.port == 636
+    assert server.tls is not None
+    assert server.tls.validate == ssl.CERT_REQUIRED
+    assert server.tls.ca_certs_file == str(ca_file)

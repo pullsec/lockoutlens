@@ -92,6 +92,7 @@ def test_run_policy_binds_with_prompted_password():
         domain="lab.local",
         username="auditor",
         use_ssl=False,
+        ca_file=None,
     )
 
     client = MagicMock()
@@ -116,6 +117,7 @@ def test_run_policy_binds_with_prompted_password():
         username="auditor",
         password="secret",
         use_ssl=False,
+        ca_file=None,
     )
 
     client.bind.assert_called_once_with()
@@ -129,6 +131,7 @@ def test_run_policy_returns_error_on_bind_failure(capsys):
         domain="lab.local",
         username="auditor",
         use_ssl=False,
+        ca_file=None,
     )
 
     client = MagicMock()
@@ -152,3 +155,24 @@ def test_run_policy_returns_error_on_bind_failure(capsys):
 
     assert result == 1
     assert "invalidCredentials" in output
+
+def test_policy_parser_with_ca_file():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "policy",
+            "--dc",
+            "dc01.lab.local",
+            "--domain",
+            "lab.local",
+            "--username",
+            "auditor",
+            "--use-ssl",
+            "--ca-file",
+            "/tmp/lab-ca.pem",
+        ]
+    )
+
+    assert args.use_ssl is True
+    assert args.ca_file == "/tmp/lab-ca.pem"

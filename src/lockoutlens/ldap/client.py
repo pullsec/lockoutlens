@@ -1,4 +1,6 @@
-from ldap3 import Connection, Server
+import ssl
+
+from ldap3 import Connection, Server, Tls
 
 from lockoutlens.ldap.exceptions import LDAPBindError
 
@@ -12,12 +14,14 @@ class LDAPClient:
         username: str,
         password: str,
         use_ssl: bool = False,
+        ca_file: str | None = None,
     ) -> None:
         self.dc = dc
         self.domain = domain
         self.username = username
         self.password = password
         self.use_ssl = use_ssl
+        self.ca_file = ca_file
 
     @property
     def bind_user(self) -> str:
@@ -29,10 +33,19 @@ class LDAPClient:
 
     def create_server(self) -> Server:
         """Create the LDAP server configuration."""
+        tls = None
+
+        if self.use_ssl:
+            tls = Tls(
+                validate=ssl.CERT_REQUIRED,
+                ca_certs_file=self.ca_file,
+            )
+
         return Server(
             self.dc,
             port=636 if self.use_ssl else 389,
             use_ssl=self.use_ssl,
+            tls=tls,
         )
 
     def create_connection(self) -> Connection:

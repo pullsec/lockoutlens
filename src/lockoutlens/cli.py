@@ -57,6 +57,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Use LDAPS for the connection.",
     )
 
+    policy_parser.add_argument(
+        "--ca-file",
+        help="CA certificate file used to validate the LDAPS server.",
+    )
+
     return parser
 
 def run_policy(args: argparse.Namespace) -> int:
@@ -69,6 +74,7 @@ def run_policy(args: argparse.Namespace) -> int:
         username=args.username,
         password=password,
         use_ssl=args.use_ssl,
+        ca_file=args.ca_file,
     )
 
     try:
