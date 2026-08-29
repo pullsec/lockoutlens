@@ -29,12 +29,17 @@ class DomainPolicy:
     lockout_duration_seconds: int | None
     lockout_observation_window_seconds: int | None
 
-def ad_interval_to_seconds(value: int | None) -> int | None:
+def ad_interval_to_seconds(
+    value: int | str | None,
+) -> int | None:
     """Convert an Active Directory interval to seconds."""
     if value is None:
         return None
 
-    return abs(value) // AD_TICKS_PER_SECOND
+    ticks = int(value)
+
+    return abs(ticks) // AD_TICKS_PER_SECOND
+
 
 def normalize_domain_policy(
     raw_policy: dict[str, Any],

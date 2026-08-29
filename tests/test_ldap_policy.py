@@ -148,3 +148,6 @@ def test_domain_policy_is_immutable():
 
     with pytest.raises(AttributeError):
         policy.lockout_threshold = 10
+
+def test_ad_interval_to_seconds_accepts_string_value():
+    assert ad_interval_to_seconds("-18000000000") == 1800
