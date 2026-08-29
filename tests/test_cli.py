@@ -1,8 +1,11 @@
+from argparse import Namespace
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from lockoutlens import __version__
-from lockoutlens.cli import build_parser
-
+from lockoutlens.cli import build_parser, run_policy
+from lockoutlens.ldap.exceptions import LDAPBindError
 
 def test_parser_program_name():
     parser = build_parser()
@@ -82,3 +85,70 @@ def test_policy_requires_connection_arguments():
         parser.parse_args(["policy"])
 
     assert exc_info.value.code == 2
+
+def test_run_policy_binds_with_prompted_password():
+    args = Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=False,
+    )
+
+    client = MagicMock()
+
+    with (
+        patch(
+            "lockoutlens.cli.getpass",
+            return_value="secret",
+        ) as mock_getpass,
+        patch(
+            "lockoutlens.cli.LDAPClient",
+            return_value=client,
+        ) as mock_client,
+    ):
+        result = run_policy(args)
+
+    mock_getpass.assert_called_once_with("Password: ")
+
+    mock_client.assert_called_once_with(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        password="secret",
+        use_ssl=False,
+    )
+
+    client.bind.assert_called_once_with()
+
+    assert result == 0
+
+
+def test_run_policy_returns_error_on_bind_failure(capsys):
+    args = Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=False,
+    )
+
+    client = MagicMock()
+    client.bind.side_effect = LDAPBindError(
+        "LDAP bind failed: invalidCredentials"
+    )
+
+    with (
+        patch(
+            "lockoutlens.cli.getpass",
+            return_value="secret",
+        ),
+        patch(
+            "lockoutlens.cli.LDAPClient",
+            return_value=client,
+        ),
+    ):
+        result = run_policy(args)
+
+    output = capsys.readouterr().out
+
+    assert result == 1
+    assert "invalidCredentials" in output

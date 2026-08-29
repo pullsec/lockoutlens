@@ -1,7 +1,9 @@
 import argparse
+from getpass import getpass
 
 from lockoutlens import __version__
-
+from lockoutlens.ldap.client import LDAPClient
+from lockoutlens.ldap.exceptions import LDAPBindError
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -57,11 +59,37 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
+def run_policy(args: argparse.Namespace) -> int:
+    """Run the Active Directory policy audit command."""
+    password = getpass("Password: ")
 
-def main() -> None:
+    client = LDAPClient(
+        dc=args.dc,
+        domain=args.domain,
+        username=args.username,
+        password=password,
+        use_ssl=args.use_ssl,
+    )
+
+    try:
+        client.bind()
+    except LDAPBindError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    print(f"Connected to {args.dc}")
+    return 0
+
+
+def main() -> int:
     parser = build_parser()
-    parser.parse_args()
+    args = parser.parse_args()
 
+    if args.command == "policy":
+        return run_policy(args)
+
+    parser.print_help()
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
