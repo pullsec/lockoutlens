@@ -1,6 +1,7 @@
 import argparse
-from getpass import getpass
 
+from getpass import getpass
+from lockoutlens.formatting import format_duration
 from lockoutlens import __version__
 from lockoutlens.ldap.client import LDAPClient
 from lockoutlens.ldap.exceptions import LDAPBindError, LDAPError
@@ -109,11 +110,11 @@ def run_policy(args: argparse.Namespace) -> int:
     )
     print(
         f"Minimum age:         "
-        f"{policy.min_password_age_seconds} seconds"
+        f"{format_duration(policy.min_password_age_seconds)}"
     )
     print(
         f"Maximum age:         "
-        f"{policy.max_password_age_seconds} seconds"
+        f"{format_duration(policy.max_password_age_seconds)}"
     )
     print()
     print("Lockout Policy")
@@ -121,11 +122,11 @@ def run_policy(args: argparse.Namespace) -> int:
     print(f"Threshold:           {policy.lockout_threshold}")
     print(
         f"Observation window:  "
-        f"{policy.lockout_observation_window_seconds} seconds"
+        f"{format_duration(policy.lockout_observation_window_seconds)}"
     )
     print(
         f"Lockout duration:    "
-        f"{policy.lockout_duration_seconds} seconds"
+        f"{format_duration(policy.lockout_duration_seconds)}"
     )
 
     return 0

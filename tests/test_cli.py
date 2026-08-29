@@ -157,9 +157,11 @@ def test_run_policy_reads_and_displays_domain_policy(capsys):
     assert "Domain:              lab.local" in output
     assert "Minimum length:      12" in output
     assert "Password history:    24" in output
+    assert "Minimum age:         1 day" in output
+    assert "Maximum age:         42 days" in output
     assert "Threshold:           5" in output
-    assert "Observation window:  1800 seconds" in output
-    assert "Lockout duration:    1800 seconds" in output
+    assert "Observation window:  30 minutes" in output
+    assert "Lockout duration:    30 minutes" in output
 
 
 def test_run_policy_returns_error_on_bind_failure(capsys):
