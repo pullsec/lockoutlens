@@ -11,7 +11,9 @@ requires-python = ">=3.11"
 authors = [
     { name = "pullsec" }
 ]
-dependencies = []
+dependencies = [
+    "ldap3>=2.9,<3",
+]
 
 [project.scripts]
 lockoutlens = "lockoutlens.cli:main"
