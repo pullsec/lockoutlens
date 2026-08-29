@@ -6,9 +6,9 @@ from ldap3 import BASE
 from lockoutlens.ldap.exceptions import LDAPError
 from lockoutlens.ldap.policy import (
     DOMAIN_POLICY_ATTRIBUTES,
+    ad_interval_to_seconds,
     get_domain_policy,
 )
-
 
 def test_get_domain_policy():
     connection = MagicMock()
@@ -74,3 +74,20 @@ def test_get_domain_policy_raises_when_no_entry_is_returned():
             connection,
             "DC=lab,DC=local",
         )
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (-18_000_000_000, 1800),
+        (-864_000_000_000, 86400),
+        (-36_288_000_000_000, 3628800),
+        (0, 0),
+        (None, None),
+    ],
+)
+def test_ad_interval_to_seconds(value, expected):
+    assert ad_interval_to_seconds(value) == expected
+
+
+def test_ad_interval_to_seconds_accepts_positive_value():
+    assert ad_interval_to_seconds(18_000_000_000) == 1800

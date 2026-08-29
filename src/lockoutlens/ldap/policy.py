@@ -15,6 +15,15 @@ DOMAIN_POLICY_ATTRIBUTES = (
     "lockoutObservationWindow",
 )
 
+AD_TICKS_PER_SECOND = 10_000_000
+
+
+def ad_interval_to_seconds(value: int | None) -> int | None:
+    """Convert an Active Directory interval to seconds."""
+    if value is None:
+        return None
+
+    return abs(value) // AD_TICKS_PER_SECOND
 
 def get_domain_policy(
     connection: Connection,
