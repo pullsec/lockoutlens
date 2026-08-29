@@ -1,4 +1,9 @@
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from lockoutlens.ldap.client import LDAPClient
+from lockoutlens.ldap.exceptions import LDAPBindError
 
 
 def test_bind_user_from_short_username():
@@ -65,3 +70,70 @@ def test_connection_is_not_automatically_bound():
 
     assert connection.user == "auditor@lab.local"
     assert connection.bound is False
+
+def test_bind_returns_bound_connection():
+    client = LDAPClient(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        password="secret",
+    )
+
+    connection = MagicMock()
+    connection.bind.return_value = True
+
+    with patch.object(
+        client,
+        "create_connection",
+        return_value=connection,
+    ):
+        result = client.bind()
+
+    connection.bind.assert_called_once_with()
+    assert result is connection
+
+
+def test_bind_raises_on_authentication_failure():
+    client = LDAPClient(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        password="secret",
+    )
+
+    connection = MagicMock()
+    connection.bind.return_value = False
+    connection.result = {
+        "description": "invalidCredentials",
+    }
+
+    with patch.object(
+        client,
+        "create_connection",
+        return_value=connection,
+    ):
+        with pytest.raises(
+            LDAPBindError,
+            match="invalidCredentials",
+        ):
+            client.bind()
+
+
+def test_bind_wraps_connection_error():
+    client = LDAPClient(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        password="secret",
+    )
+
+    with patch.object(
+        client,
+        "create_connection",
+        side_effect=OSError("connection refused"),
+    ):
+        with pytest.raises(
+            LDAPBindError,
+            match="Unable to connect",
+        ):
+            client.bind()

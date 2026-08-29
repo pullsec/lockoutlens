@@ -1,5 +1,6 @@
 from ldap3 import Connection, Server
 
+from lockoutlens.ldap.exceptions import LDAPBindError
 
 class LDAPClient:
     """LDAP connection client for Active Directory."""
@@ -42,3 +43,26 @@ class LDAPClient:
             password=self.password,
             auto_bind=False,
         )
+
+    def bind(self) -> Connection:
+        """Create and bind an authenticated LDAP connection."""
+        try:
+            connection = self.create_connection()
+
+            if not connection.bind():
+                description = connection.result.get(
+                    "description",
+                    "unknown LDAP error",
+                )
+                raise LDAPBindError(
+                    f"LDAP bind failed: {description}"
+                )
+
+            return connection
+
+        except LDAPBindError:
+            raise
+        except Exception as exc:
+            raise LDAPBindError(
+                f"Unable to connect to LDAP server {self.dc}: {exc}"
+            ) from exc
