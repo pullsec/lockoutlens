@@ -4,7 +4,7 @@ import pytest
 import ssl
 
 from lockoutlens.ldap.client import LDAPClient
-from lockoutlens.ldap.exceptions import LDAPBindError
+from lockoutlens.ldap.exceptions import LDAPBindError, LDAPError
 from ldap3 import BASE
 
 def test_bind_user_from_short_username():
@@ -114,7 +114,7 @@ def test_bind_raises_on_authentication_failure():
         return_value=connection,
     ):
         with pytest.raises(
-            LDAPBindError,
+            LDAPBindError,        
             match="invalidCredentials",
         ):
             client.bind()
@@ -199,7 +199,7 @@ def test_get_default_naming_context_raises_when_search_fails():
     connection.entries = []
 
     with pytest.raises(
-        LDAPBindError,
+        LDAPError,
         match="Unable to retrieve defaultNamingContext",
     ):
         client.get_default_naming_context(connection)
@@ -221,7 +221,10 @@ def test_get_default_naming_context_raises_when_value_is_missing():
     connection.entries = [entry]
 
     with pytest.raises(
-        LDAPBindError,
+        LDAPError,
         match="did not return defaultNamingContext",
     ):
         client.get_default_naming_context(connection)
+
+def test_ldap_bind_error_inherits_from_ldap_error():
+    assert issubclass(LDAPBindError, LDAPError)
