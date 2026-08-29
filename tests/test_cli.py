@@ -171,8 +171,8 @@ def test_run_policy_returns_error_on_bind_failure(capsys):
         dc="dc01.lab.local",
         domain="lab.local",
         username="auditor",
-        use_ssl=False,
-        ca_file=None,
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
     )
 
     client = MagicMock()
@@ -252,3 +252,19 @@ def test_run_policy_unbinds_connection_on_ldap_error(capsys):
 
     output = capsys.readouterr().out
     assert "Error: RootDSE failure" in output
+
+def test_run_policy_rejects_unencrypted_ldap(capsys):
+    args = argparse.Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=False,
+        ca_file=None,
+    )
+
+    result = run_policy(args)
+
+    assert result == 1
+
+    output = capsys.readouterr().out
+    assert "LDAPS is required" in output

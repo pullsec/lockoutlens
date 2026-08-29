@@ -71,6 +71,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_policy(args: argparse.Namespace) -> int:
     """Run the Active Directory policy audit command."""
+    if not args.use_ssl:
+        print("Error: LDAPS is required")
+        return 1
+
     password = getpass("Password: ")
 
     client = LDAPClient(
