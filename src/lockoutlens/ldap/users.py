@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 from ldap3 import SUBTREE, Connection
 from lockoutlens.ldap.exceptions import LDAPError
+from datetime import datetime
 
 
 ACCOUNTDISABLE = 0x0002
@@ -13,6 +14,7 @@ USER_ATTRIBUTES = (
     "userAccountControl",
     "lockoutTime",
     "badPwdCount",
+    "badPasswordTime",
 )
 
 
@@ -26,6 +28,7 @@ class ADUser:
     enabled: bool
     lockout_time: int
     bad_password_count: int
+    bad_password_time: datetime | None
 
     @property
     def locked(self) -> bool:
@@ -38,6 +41,19 @@ def is_account_enabled(user_account_control: int | str) -> bool:
     value = int(user_account_control)
 
     return not bool(value & ACCOUNTDISABLE)
+
+
+def normalize_ad_filetime_datetime(
+    value: datetime | None,
+) -> datetime | None:
+    """Normalize an Active Directory FILETIME datetime."""
+    if value is None:
+        return None
+
+    if value.year == 1601:
+        return None
+
+    return value
 
 
 def normalize_ad_user(raw_user: dict[str, Any]) -> ADUser:
@@ -53,6 +69,9 @@ def normalize_ad_user(raw_user: dict[str, Any]) -> ADUser:
         ),
         lockout_time=int(raw_user.get("lockoutTime") or 0),
         bad_password_count=int(raw_user.get("badPwdCount") or 0),
+        bad_password_time=normalize_ad_filetime_datetime(
+            raw_user.get("badPasswordTime")
+        ),
     )
 
 

@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+from datetime import datetime, timezone
 
 import pytest
 from ldap3 import SUBTREE
@@ -10,6 +11,7 @@ from lockoutlens.ldap.users import (
     get_domain_users,
     is_account_enabled,
     normalize_ad_user,
+    normalize_ad_filetime_datetime,
 )
 
 def test_ad_user_model():
@@ -22,6 +24,7 @@ def test_ad_user_model():
         enabled=True,
         lockout_time=0,
         bad_password_count=0,
+        bad_password_time=None,
     )
 
     assert user.distinguished_name == (
@@ -42,6 +45,7 @@ def test_ad_user_allows_missing_upn():
         enabled=True,
         lockout_time=0,
         bad_password_count=0,
+        bad_password_time=None,
     )
 
     assert user.user_principal_name is None
@@ -69,6 +73,7 @@ def test_normalize_ad_user():
         "userAccountControl": 512,
         "lockoutTime": 0,
         "badPwdCount": 0,
+        "badPasswordTime": None,
     }
 
     user = normalize_ad_user(raw_user)
@@ -82,6 +87,7 @@ def test_normalize_ad_user():
         enabled=True,
         lockout_time=0,
         bad_password_count=0,
+        bad_password_time=None,
     )
 
 
@@ -116,6 +122,7 @@ def test_get_domain_users():
         "userAccountControl": 512,
         "lockoutTime": 0,
         "badPwdCount": 0,
+        "badPasswordTime": None,
     }
 
     entry.__getitem__.side_effect = lambda key: MagicMock(
@@ -141,6 +148,7 @@ def test_get_domain_users():
             "userAccountControl",
             "lockoutTime",
             "badPwdCount",
+            "badPasswordTime",
         ],
     )
 
@@ -154,6 +162,7 @@ def test_get_domain_users():
             enabled=True,
             lockout_time=0,
             bad_password_count=0,
+            bad_password_time=None,
         )
     ]
 
@@ -194,6 +203,7 @@ def test_ad_user_is_not_locked():
         enabled=True,
         lockout_time=0,
         bad_password_count=0,
+        bad_password_time=None,
     )
 
     assert user.locked is False
@@ -209,6 +219,7 @@ def test_ad_user_is_locked():
         enabled=True,
         lockout_time=133_700_000_000_000_000,
         bad_password_count=0,
+        bad_password_time=None,
     )
 
     assert user.locked is True
@@ -229,3 +240,55 @@ def test_normalize_ad_user_with_bad_password_count():
     user = normalize_ad_user(raw_user)
 
     assert user.bad_password_count == 3
+
+
+def test_normalize_ad_user_with_bad_password_time():
+    bad_password_time = datetime(
+        2026,
+        9,
+        1,
+        20,
+        30,
+        0,
+    )
+
+    raw_user = {
+        "distinguishedName": (
+            "CN=Alice,OU=Users,DC=lab,DC=local"
+        ),
+        "sAMAccountName": "alice",
+        "userPrincipalName": "alice@lab.local",
+        "userAccountControl": 512,
+        "lockoutTime": 0,
+        "badPwdCount": 2,
+        "badPasswordTime": bad_password_time,
+    }
+
+    user = normalize_ad_user(raw_user)
+
+    assert user.bad_password_time == bad_password_time
+
+
+def test_normalize_ad_filetime_datetime():
+    value = datetime(
+        2026,
+        9,
+        1,
+        20,
+        22,
+        52,
+        tzinfo=timezone.utc,
+    )
+
+    assert normalize_ad_filetime_datetime(value) == value
+
+
+def test_normalize_ad_filetime_datetime_zero_filetime():
+    value = datetime(
+        1601,
+        1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    assert normalize_ad_filetime_datetime(value) is None
