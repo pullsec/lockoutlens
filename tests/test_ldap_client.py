@@ -1,11 +1,10 @@
+import ssl
 from unittest.mock import MagicMock, patch
 
 import pytest
-import ssl
 
 from lockoutlens.ldap.client import LDAPClient
 from lockoutlens.ldap.exceptions import LDAPBindError, LDAPError
-from ldap3 import BASE
 
 def test_bind_user_from_short_username():
     client = LDAPClient(
@@ -169,24 +168,16 @@ def test_get_default_naming_context():
     )
 
     connection = MagicMock()
-    connection.search.return_value = True
-
-    entry = MagicMock()
-    entry.defaultNamingContext.value = "DC=lab,DC=local"
-    connection.entries = [entry]
+    connection.server.info.other = {
+        "defaultNamingContext": ["DC=lab,DC=local"],
+    }
 
     result = client.get_default_naming_context(connection)
 
-    connection.search.assert_called_once_with(
-        search_base="",
-        search_filter="(objectClass=*)",
-        search_scope=BASE,
-        attributes=["defaultNamingContext"],
-    )
-
     assert result == "DC=lab,DC=local"
 
-def test_get_default_naming_context_raises_when_search_fails():
+
+def test_get_default_naming_context_raises_when_server_info_missing():
     client = LDAPClient(
         dc="dc01.lab.local",
         domain="lab.local",
@@ -195,12 +186,11 @@ def test_get_default_naming_context_raises_when_search_fails():
     )
 
     connection = MagicMock()
-    connection.search.return_value = False
-    connection.entries = []
+    connection.server.info = None
 
     with pytest.raises(
         LDAPError,
-        match="Unable to retrieve defaultNamingContext",
+        match="LDAP server information is unavailable",
     ):
         client.get_default_naming_context(connection)
 
@@ -214,15 +204,11 @@ def test_get_default_naming_context_raises_when_value_is_missing():
     )
 
     connection = MagicMock()
-    connection.search.return_value = True
-
-    entry = MagicMock()
-    entry.defaultNamingContext.value = None
-    connection.entries = [entry]
+    connection.server.info.other = {}
 
     with pytest.raises(
         LDAPError,
-        match="did not return defaultNamingContext",
+        match="RootDSE did not return defaultNamingContext",
     ):
         client.get_default_naming_context(connection)
 

@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from ldap3 import BASE
+from datetime import timedelta
 
 from lockoutlens.ldap.exceptions import LDAPError
 from lockoutlens.ldap.policy import (
@@ -151,3 +152,14 @@ def test_domain_policy_is_immutable():
 
 def test_ad_interval_to_seconds_accepts_string_value():
     assert ad_interval_to_seconds("-18000000000") == 1800
+
+def test_ad_interval_to_seconds_from_timedelta():
+    value = timedelta(minutes=30)
+
+    assert ad_interval_to_seconds(value) == 1800
+
+
+def test_ad_interval_to_seconds_from_negative_timedelta():
+    value = timedelta(minutes=-30)
+
+    assert ad_interval_to_seconds(value) == 1800

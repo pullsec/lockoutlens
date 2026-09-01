@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from ldap3 import BASE, Connection
 
 from lockoutlens.ldap.exceptions import LDAPError
-
+from datetime import timedelta
 
 DOMAIN_POLICY_ATTRIBUTES = (
     "minPwdLength",
@@ -29,12 +29,16 @@ class DomainPolicy:
     lockout_duration_seconds: int | None
     lockout_observation_window_seconds: int | None
 
+
 def ad_interval_to_seconds(
-    value: int | str | None,
+    value: int | str | timedelta | None,
 ) -> int | None:
     """Convert an Active Directory interval to seconds."""
     if value is None:
         return None
+
+    if isinstance(value, timedelta):
+        return abs(int(value.total_seconds()))
 
     ticks = int(value)
 
