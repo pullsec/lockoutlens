@@ -30,6 +30,11 @@ class DomainPolicy:
     lockout_observation_window_seconds: int | None
 
 
+    @property
+    def lockout_enabled(self) -> bool:
+        """Return whether account lockout is enabled."""
+        return self.lockout_threshold > 0
+
 def ad_interval_to_seconds(
     value: int | str | timedelta | None,
 ) -> int | None:

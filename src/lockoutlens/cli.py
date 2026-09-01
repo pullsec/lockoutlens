@@ -129,6 +129,10 @@ def run_policy(args: argparse.Namespace) -> int:
     print()
     print("Lockout Policy")
     print("-" * 34)
+    print(
+        f"Status:              "
+        f"{'Enabled' if policy.lockout_enabled else 'Disabled'}"
+    )
     print(f"Threshold:           {policy.lockout_threshold}")
     print(
         f"Observation window:  "

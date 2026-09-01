@@ -161,6 +161,7 @@ def test_run_policy_reads_and_displays_domain_policy(capsys):
     assert "Password history:    24" in output
     assert "Minimum age:         1 day" in output
     assert "Maximum age:         42 days" in output
+    assert "Status:              Enabled" in output
     assert "Threshold:           5" in output
     assert "Observation window:  30 minutes" in output
     assert "Lockout duration:    30 minutes" in output
@@ -268,3 +269,53 @@ def test_run_policy_rejects_unencrypted_ldap(capsys):
 
     output = capsys.readouterr().out
     assert "LDAPS is required" in output
+
+
+def test_run_policy_displays_disabled_lockout_status(capsys):
+    args = argparse.Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
+    )
+
+    connection = MagicMock()
+
+    raw_policy = {
+        "minPwdLength": 7,
+        "pwdHistoryLength": 24,
+        "minPwdAge": -864_000_000_000,
+        "maxPwdAge": -36_288_000_000_000,
+        "lockoutThreshold": 0,
+        "lockoutDuration": -18_000_000_000,
+        "lockoutObservationWindow": -18_000_000_000,
+    }
+
+    with (
+        patch(
+            "lockoutlens.cli.getpass",
+            return_value="secret",
+        ),
+        patch(
+            "lockoutlens.cli.LDAPClient",
+        ) as mock_client_class,
+        patch(
+            "lockoutlens.cli.get_domain_policy",
+            return_value=raw_policy,
+        ),
+    ):
+        client = mock_client_class.return_value
+        client.bind.return_value = connection
+        client.get_default_naming_context.return_value = (
+            "DC=lab,DC=local"
+        )
+
+        result = run_policy(args)
+
+    assert result == 0
+
+    output = capsys.readouterr().out
+
+    assert "Status:              Disabled" in output
+    assert "Threshold:           0" in output

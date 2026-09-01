@@ -163,3 +163,30 @@ def test_ad_interval_to_seconds_from_negative_timedelta():
     value = timedelta(minutes=-30)
 
     assert ad_interval_to_seconds(value) == 1800
+
+def test_domain_policy_lockout_is_disabled_when_threshold_is_zero():
+    policy = DomainPolicy(
+        min_password_length=7,
+        password_history_length=24,
+        min_password_age_seconds=86400,
+        max_password_age_seconds=3628800,
+        lockout_threshold=0,
+        lockout_duration_seconds=1800,
+        lockout_observation_window_seconds=1800,
+    )
+
+    assert policy.lockout_enabled is False
+
+
+def test_domain_policy_lockout_is_enabled_when_threshold_is_positive():
+    policy = DomainPolicy(
+        min_password_length=7,
+        password_history_length=24,
+        min_password_age_seconds=86400,
+        max_password_age_seconds=3628800,
+        lockout_threshold=5,
+        lockout_duration_seconds=1800,
+        lockout_observation_window_seconds=1800,
+    )
+
+    assert policy.lockout_enabled is True
