@@ -2,8 +2,8 @@ from typing import Any
 from dataclasses import dataclass
 from ldap3 import BASE, Connection
 
+from lockoutlens.ldap.ad import ad_interval_to_seconds
 from lockoutlens.ldap.exceptions import LDAPError
-from datetime import timedelta
 
 DOMAIN_POLICY_ATTRIBUTES = (
     "minPwdLength",
@@ -14,8 +14,6 @@ DOMAIN_POLICY_ATTRIBUTES = (
     "lockoutDuration",
     "lockoutObservationWindow",
 )
-
-AD_TICKS_PER_SECOND = 10_000_000
 
 @dataclass(frozen=True)
 class DomainPolicy:
@@ -34,21 +32,6 @@ class DomainPolicy:
     def lockout_enabled(self) -> bool:
         """Return whether account lockout is enabled."""
         return self.lockout_threshold > 0
-
-def ad_interval_to_seconds(
-    value: int | str | timedelta | None,
-) -> int | None:
-    """Convert an Active Directory interval to seconds."""
-    if value is None:
-        return None
-
-    if isinstance(value, timedelta):
-        return abs(int(value.total_seconds()))
-
-    ticks = int(value)
-
-    return abs(ticks) // AD_TICKS_PER_SECOND
-
 
 def normalize_domain_policy(
     raw_policy: dict[str, Any],

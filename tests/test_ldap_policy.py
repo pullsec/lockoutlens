@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+from lockoutlens.ldap.ad import ad_interval_to_seconds
 
 import pytest
 from ldap3 import BASE
@@ -8,7 +9,6 @@ from lockoutlens.ldap.exceptions import LDAPError
 from lockoutlens.ldap.policy import (
     DOMAIN_POLICY_ATTRIBUTES,
     DomainPolicy,
-    ad_interval_to_seconds,
     get_domain_policy,
     normalize_domain_policy,
 )
