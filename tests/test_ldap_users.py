@@ -21,6 +21,7 @@ def test_ad_user_model():
         user_principal_name="alice@lab.local",
         enabled=True,
         lockout_time=0,
+        bad_password_count=0,
     )
 
     assert user.distinguished_name == (
@@ -40,6 +41,7 @@ def test_ad_user_allows_missing_upn():
         user_principal_name=None,
         enabled=True,
         lockout_time=0,
+        bad_password_count=0,
     )
 
     assert user.user_principal_name is None
@@ -66,6 +68,7 @@ def test_normalize_ad_user():
         "userPrincipalName": "alice@lab.local",
         "userAccountControl": 512,
         "lockoutTime": 0,
+        "badPwdCount": 0,
     }
 
     user = normalize_ad_user(raw_user)
@@ -78,6 +81,7 @@ def test_normalize_ad_user():
         user_principal_name="alice@lab.local",
         enabled=True,
         lockout_time=0,
+        bad_password_count=0,
     )
 
 
@@ -111,6 +115,7 @@ def test_get_domain_users():
         "userPrincipalName": "alice@lab.local",
         "userAccountControl": 512,
         "lockoutTime": 0,
+        "badPwdCount": 0,
     }
 
     entry.__getitem__.side_effect = lambda key: MagicMock(
@@ -135,6 +140,7 @@ def test_get_domain_users():
             "userPrincipalName",
             "userAccountControl",
             "lockoutTime",
+            "badPwdCount",
         ],
     )
 
@@ -147,6 +153,7 @@ def test_get_domain_users():
             user_principal_name="alice@lab.local",
             enabled=True,
             lockout_time=0,
+            bad_password_count=0,
         )
     ]
 
@@ -186,6 +193,7 @@ def test_ad_user_is_not_locked():
         user_principal_name="alice@lab.local",
         enabled=True,
         lockout_time=0,
+        bad_password_count=0,
     )
 
     assert user.locked is False
@@ -200,6 +208,24 @@ def test_ad_user_is_locked():
         user_principal_name="alice@lab.local",
         enabled=True,
         lockout_time=133_700_000_000_000_000,
+        bad_password_count=0,
     )
 
     assert user.locked is True
+
+
+def test_normalize_ad_user_with_bad_password_count():
+    raw_user = {
+        "distinguishedName": (
+            "CN=Alice,OU=Users,DC=lab,DC=local"
+        ),
+        "sAMAccountName": "alice",
+        "userPrincipalName": "alice@lab.local",
+        "userAccountControl": 512,
+        "lockoutTime": 0,
+        "badPwdCount": 3,
+    }
+
+    user = normalize_ad_user(raw_user)
+
+    assert user.bad_password_count == 3

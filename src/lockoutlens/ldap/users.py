@@ -12,6 +12,7 @@ USER_ATTRIBUTES = (
     "userPrincipalName",
     "userAccountControl",
     "lockoutTime",
+    "badPwdCount",
 )
 
 
@@ -24,6 +25,7 @@ class ADUser:
     user_principal_name: str | None
     enabled: bool
     lockout_time: int
+    bad_password_count: int
 
     @property
     def locked(self) -> bool:
@@ -50,6 +52,7 @@ def normalize_ad_user(raw_user: dict[str, Any]) -> ADUser:
             raw_user["userAccountControl"] 
         ),
         lockout_time=int(raw_user.get("lockoutTime") or 0),
+        bad_password_count=int(raw_user.get("badPwdCount") or 0),
     )
 
 
