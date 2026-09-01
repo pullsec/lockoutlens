@@ -15,6 +15,7 @@ USER_ATTRIBUTES = (
     "lockoutTime",
     "badPwdCount",
     "badPasswordTime",
+    "msDS-ResultantPSO",
 )
 
 
@@ -29,6 +30,7 @@ class ADUser:
     lockout_time: int
     bad_password_count: int
     bad_password_time: datetime | None
+    resultant_pso: str | None
 
     @property
     def locked(self) -> bool:
@@ -71,6 +73,11 @@ def normalize_ad_user(raw_user: dict[str, Any]) -> ADUser:
         bad_password_count=int(raw_user.get("badPwdCount") or 0),
         bad_password_time=normalize_ad_filetime_datetime(
             raw_user.get("badPasswordTime")
+        ),
+        resultant_pso=(
+            str(raw_user["msDS-ResultantPSO"])
+            if raw_user.get("msDS-ResultantPSO")
+            else None
         ),
     )
 

@@ -25,6 +25,7 @@ def test_ad_user_model():
         lockout_time=0,
         bad_password_count=0,
         bad_password_time=None,
+        resultant_pso=None,
     )
 
     assert user.distinguished_name == (
@@ -46,6 +47,7 @@ def test_ad_user_allows_missing_upn():
         lockout_time=0,
         bad_password_count=0,
         bad_password_time=None,
+        resultant_pso=None,
     )
 
     assert user.user_principal_name is None
@@ -74,6 +76,7 @@ def test_normalize_ad_user():
         "lockoutTime": 0,
         "badPwdCount": 0,
         "badPasswordTime": None,
+        "msDS-ResultantPSO": None,
     }
 
     user = normalize_ad_user(raw_user)
@@ -88,6 +91,7 @@ def test_normalize_ad_user():
         lockout_time=0,
         bad_password_count=0,
         bad_password_time=None,
+        resultant_pso=None,
     )
 
 
@@ -123,6 +127,7 @@ def test_get_domain_users():
         "lockoutTime": 0,
         "badPwdCount": 0,
         "badPasswordTime": None,
+        "msDS-ResultantPSO": None,
     }
 
     entry.__getitem__.side_effect = lambda key: MagicMock(
@@ -149,6 +154,7 @@ def test_get_domain_users():
             "lockoutTime",
             "badPwdCount",
             "badPasswordTime",
+            "msDS-ResultantPSO",
         ],
     )
 
@@ -163,6 +169,7 @@ def test_get_domain_users():
             lockout_time=0,
             bad_password_count=0,
             bad_password_time=None,
+        resultant_pso=None,
         )
     ]
 
@@ -204,6 +211,7 @@ def test_ad_user_is_not_locked():
         lockout_time=0,
         bad_password_count=0,
         bad_password_time=None,
+        resultant_pso=None,
     )
 
     assert user.locked is False
@@ -220,6 +228,7 @@ def test_ad_user_is_locked():
         lockout_time=133_700_000_000_000_000,
         bad_password_count=0,
         bad_password_time=None,
+        resultant_pso=None,
     )
 
     assert user.locked is True
@@ -292,3 +301,28 @@ def test_normalize_ad_filetime_datetime_zero_filetime():
     )
 
     assert normalize_ad_filetime_datetime(value) is None
+
+
+def test_normalize_ad_user_with_resultant_pso():
+    raw_user = {
+        "distinguishedName": (
+            "CN=Alice,OU=Users,DC=lab,DC=local"
+        ),
+        "sAMAccountName": "alice",
+        "userPrincipalName": "alice@lab.local",
+        "userAccountControl": 512,
+        "lockoutTime": 0,
+        "badPwdCount": 0,
+        "badPasswordTime": None,
+        "msDS-ResultantPSO": (
+            "CN=StrictPolicy,CN=Password Settings Container,"
+            "CN=System,DC=lab,DC=local"
+        ),
+    }
+
+    user = normalize_ad_user(raw_user)
+
+    assert user.resultant_pso == (
+        "CN=StrictPolicy,CN=Password Settings Container,"
+        "CN=System,DC=lab,DC=local"
+    )
