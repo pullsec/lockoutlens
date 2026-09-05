@@ -20,6 +20,7 @@ def test_ad_user_model():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         sam_account_name="alice",
+        sid="S-1-5-21-1111111111-2222222222-3333333333-1100",
         user_principal_name="alice@lab.local",
         enabled=True,
         lockout_time=0,
@@ -42,6 +43,7 @@ def test_ad_user_allows_missing_upn():
             "CN=Service Account,OU=Users,DC=lab,DC=local"
         ),
         sam_account_name="svc_app",
+        sid="S-1-5-21-1111111111-2222222222-3333333333-1100",
         user_principal_name=None,
         enabled=True,
         lockout_time=0,
@@ -71,6 +73,7 @@ def test_normalize_ad_user():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         "sAMAccountName": "alice",
+        "objectSid": "S-1-5-21-1111111111-2222222222-3333333333-1100",
         "userPrincipalName": "alice@lab.local",
         "userAccountControl": 512,
         "lockoutTime": 0,
@@ -86,6 +89,7 @@ def test_normalize_ad_user():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         sam_account_name="alice",
+        sid="S-1-5-21-1111111111-2222222222-3333333333-1100",
         user_principal_name="alice@lab.local",
         enabled=True,
         lockout_time=0,
@@ -101,6 +105,7 @@ def test_normalize_ad_user_without_upn():
             "CN=Service Account,OU=Users,DC=lab,DC=local"
         ),
         "sAMAccountName": "svc_app",
+        "objectSid": "S-1-5-21-1111111111-2222222222-3333333333-1100",
         "userPrincipalName": None,
         "userAccountControl": 514,
     }
@@ -109,6 +114,27 @@ def test_normalize_ad_user_without_upn():
 
     assert user.user_principal_name is None
     assert user.enabled is False
+
+
+def test_normalize_ad_user_with_sid():
+    raw_user = {
+        "distinguishedName": (
+            "CN=test,OU=LockoutLens,"
+            "DC=ad,DC=lockoutlens,DC=test"
+        ),
+        "sAMAccountName": "test",
+        "userPrincipalName": "test@ad.lockoutlens.test",
+        "userAccountControl": 512,
+        "objectSid": (
+            "S-1-5-21-4137994730-223011928-2956659907-1103"
+        ),
+    }
+
+    user = normalize_ad_user(raw_user)
+
+    assert user.sid == (
+        "S-1-5-21-4137994730-223011928-2956659907-1103"
+    )
 
 
 def test_get_domain_users():
@@ -122,6 +148,7 @@ def test_get_domain_users():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         "sAMAccountName": "alice",
+        "objectSid": "S-1-5-21-1111111111-2222222222-3333333333-1100",
         "userPrincipalName": "alice@lab.local",
         "userAccountControl": 512,
         "lockoutTime": 0,
@@ -151,6 +178,7 @@ def test_get_domain_users():
             "sAMAccountName",
             "userPrincipalName",
             "userAccountControl",
+            "objectSid",
             "lockoutTime",
             "badPwdCount",
             "badPasswordTime",
@@ -164,6 +192,7 @@ def test_get_domain_users():
                 "CN=Alice,OU=Users,DC=lab,DC=local"
             ),
             sam_account_name="alice",
+            sid="S-1-5-21-1111111111-2222222222-3333333333-1100",
             user_principal_name="alice@lab.local",
             enabled=True,
             lockout_time=0,
@@ -206,6 +235,7 @@ def test_ad_user_is_not_locked():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         sam_account_name="alice",
+        sid="S-1-5-21-1111111111-2222222222-3333333333-1100",
         user_principal_name="alice@lab.local",
         enabled=True,
         lockout_time=0,
@@ -223,6 +253,7 @@ def test_ad_user_is_locked():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         sam_account_name="alice",
+        sid="S-1-5-21-1111111111-2222222222-3333333333-1100",
         user_principal_name="alice@lab.local",
         enabled=True,
         lockout_time=133_700_000_000_000_000,
@@ -240,6 +271,7 @@ def test_normalize_ad_user_with_bad_password_count():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         "sAMAccountName": "alice",
+        "objectSid": "S-1-5-21-1111111111-2222222222-3333333333-1100",
         "userPrincipalName": "alice@lab.local",
         "userAccountControl": 512,
         "lockoutTime": 0,
@@ -266,6 +298,7 @@ def test_normalize_ad_user_with_bad_password_time():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         "sAMAccountName": "alice",
+        "objectSid": "S-1-5-21-1111111111-2222222222-3333333333-1100",
         "userPrincipalName": "alice@lab.local",
         "userAccountControl": 512,
         "lockoutTime": 0,
@@ -309,6 +342,7 @@ def test_normalize_ad_user_with_resultant_pso():
             "CN=Alice,OU=Users,DC=lab,DC=local"
         ),
         "sAMAccountName": "alice",
+        "objectSid": "S-1-5-21-1111111111-2222222222-3333333333-1100",
         "userPrincipalName": "alice@lab.local",
         "userAccountControl": 512,
         "lockoutTime": 0,

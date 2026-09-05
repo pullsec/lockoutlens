@@ -48,6 +48,7 @@ def make_user(
     return ADUser(
         distinguished_name="CN=test,DC=lab,DC=local",
         sam_account_name="test",
+        sid="S-1-5-21-1111111111-2222222222-3333333333-1100",
         user_principal_name="test@lab.local",
         enabled=True,
         lockout_time=0,

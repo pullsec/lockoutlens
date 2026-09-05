@@ -12,6 +12,7 @@ USER_ATTRIBUTES = (
     "sAMAccountName",
     "userPrincipalName",
     "userAccountControl",
+    "objectSid",
     "lockoutTime",
     "badPwdCount",
     "badPasswordTime",
@@ -25,6 +26,7 @@ class ADUser:
 
     distinguished_name: str
     sam_account_name: str
+    sid: str
     user_principal_name: str | None
     enabled: bool
     lockout_time: int
@@ -65,6 +67,7 @@ def normalize_ad_user(raw_user: dict[str, Any]) -> ADUser:
     return ADUser(
         distinguished_name=str(raw_user["distinguishedName"]),
         sam_account_name=str(raw_user["sAMAccountName"]),
+        sid=str(raw_user["objectSid"]),
         user_principal_name=str(upn) if upn else None,
         enabled=is_account_enabled(
             raw_user["userAccountControl"] 
