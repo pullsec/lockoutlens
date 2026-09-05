@@ -717,3 +717,72 @@ def test_run_audit_displays_account_plans(capsys):
     assert "builtin_administrator" in output
 
     connection.unbind.assert_called_once()
+
+
+def test_run_audit_unbinds_on_ldap_error(capsys):
+    args = argparse.Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
+    )
+
+    connection = MagicMock()
+
+    policy = DomainPolicy(
+        min_password_length=8,
+        password_history_length=24,
+        min_password_age_seconds=0,
+        max_password_age_seconds=3628800,
+        lockout_threshold=0,
+        lockout_duration_seconds=1800,
+        lockout_observation_window_seconds=1800,
+    )
+
+    user = ADUser(
+        distinguished_name="CN=auditor,DC=lab,DC=local",
+        sam_account_name="auditor",
+        sid="S-1-5-21-1-2-3-1103",
+        user_principal_name="auditor@lab.local",
+        enabled=True,
+        lockout_time=0,
+        bad_password_count=0,
+        bad_password_time=None,
+        resultant_pso=None,
+    )
+
+    with (
+        patch("lockoutlens.cli.getpass", return_value="secret"),
+        patch("lockoutlens.cli.LDAPClient") as mock_client_class,
+        patch(
+            "lockoutlens.cli.get_domain_policy",
+            return_value={"raw": "policy"},
+        ),
+        patch(
+            "lockoutlens.cli.normalize_domain_policy",
+            return_value=policy,
+        ),
+        patch(
+            "lockoutlens.cli.get_domain_users",
+            return_value=[user],
+        ),
+        patch(
+            "lockoutlens.cli.resolve_effective_policy",
+            side_effect=LDAPError("Unable to retrieve PSO"),
+        ),
+    ):
+        client = mock_client_class.return_value
+        client.bind.return_value = connection
+        client.get_default_naming_context.return_value = (
+            "DC=lab,DC=local"
+        )
+
+        result = run_audit(args)
+
+    assert result == 1
+    assert (
+        capsys.readouterr().out.strip()
+        == "Error: Unable to retrieve PSO"
+    )
+    connection.unbind.assert_called_once()
