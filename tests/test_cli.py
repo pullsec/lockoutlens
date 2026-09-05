@@ -4,10 +4,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from lockoutlens import __version__
-from lockoutlens.cli import build_parser, main, run_policy
+from lockoutlens.cli import build_parser, main, run_audit, run_policy
 from lockoutlens.ldap.exceptions import LDAPBindError
 from lockoutlens.ldap.exceptions import LDAPError
 
+from lockoutlens.ldap.policy import DomainPolicy
+from lockoutlens.ldap.users import ADUser
+
+from lockoutlens.ldap.effective_policy import EffectivePolicy
+from lockoutlens.planner import AccountPlan
 
 def test_parser_program_name():
     parser = build_parser()
@@ -319,3 +324,396 @@ def test_run_policy_displays_disabled_lockout_status(capsys):
 
     assert "Status:              Disabled" in output
     assert "Threshold:           0" in output
+
+
+def test_audit_parser():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "audit",
+            "--dc",
+            "dc01.lab.local",
+            "--domain",
+            "lab.local",
+            "--username",
+            "auditor",
+        ]
+    )
+
+    assert args.command == "audit"
+    assert args.dc == "dc01.lab.local"
+    assert args.domain == "lab.local"
+    assert args.username == "auditor"
+    assert args.use_ssl is False
+
+
+def test_audit_requires_connection_arguments():
+    parser = build_parser()
+
+    with pytest.raises(SystemExit) as exc_info:
+        parser.parse_args(["audit"])
+
+    assert exc_info.value.code == 2
+
+
+def test_audit_parser_with_ssl_and_ca_file():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "audit",
+            "--dc",
+            "dc01.lab.local",
+            "--domain",
+            "lab.local",
+            "--username",
+            "auditor",
+            "--use-ssl",
+            "--ca-file",
+            "/tmp/lab-ca.pem",
+        ]
+    )
+
+    assert args.command == "audit"
+    assert args.use_ssl is True
+    assert args.ca_file == "/tmp/lab-ca.pem"
+
+
+def test_run_audit_rejects_unencrypted_ldap(capsys):
+    args = argparse.Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=False,
+        ca_file=None,
+    )
+
+    result = run_audit(args)
+
+    assert result == 1
+    assert capsys.readouterr().out.strip() == "Error: LDAPS is required"
+
+
+def test_main_dispatches_audit_command():
+    with (
+        patch(
+            "sys.argv",
+            [
+                "lockoutlens",
+                "audit",
+                "--dc",
+                "dc01.lab.local",
+                "--domain",
+                "lab.local",
+                "--username",
+                "auditor",
+                "--use-ssl",
+            ],
+        ),
+        patch(
+            "lockoutlens.cli.run_audit",
+            return_value=7,
+        ) as mock_run_audit,
+    ):
+        result = main()
+
+    assert result == 7
+    mock_run_audit.assert_called_once()
+
+    args = mock_run_audit.call_args.args[0]
+
+    assert args.command == "audit"
+    assert args.dc == "dc01.lab.local"
+    assert args.domain == "lab.local"
+    assert args.username == "auditor"
+    assert args.use_ssl is True
+
+
+def test_run_audit_discovers_domain_policy_and_users(capsys):
+    args = argparse.Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
+    )
+
+    connection = MagicMock()
+
+    policy = DomainPolicy(
+        min_password_length=8,
+        password_history_length=24,
+        min_password_age_seconds=0,
+        max_password_age_seconds=3628800,
+        lockout_threshold=0,
+        lockout_duration_seconds=1800,
+        lockout_observation_window_seconds=1800,
+    )
+
+    users = [
+        ADUser(
+            distinguished_name="CN=auditor,DC=lab,DC=local",
+            sam_account_name="auditor",
+            sid="S-1-5-21-1111111111-2222222222-3333333333-1103",
+            user_principal_name="auditor@lab.local",
+            enabled=True,
+            lockout_time=0,
+            bad_password_count=0,
+            bad_password_time=None,
+            resultant_pso=None,
+        ),
+    ]
+
+    with (
+        patch(
+            "lockoutlens.cli.getpass",
+            return_value="secret",
+        ),
+        patch("lockoutlens.cli.LDAPClient") as mock_client_class,
+        patch(
+            "lockoutlens.cli.get_domain_policy",
+            return_value={"raw": "policy"},
+        ) as mock_get_domain_policy,
+        patch(
+            "lockoutlens.cli.normalize_domain_policy",
+            return_value=policy,
+        ) as mock_normalize_domain_policy,
+        patch(
+            "lockoutlens.cli.get_domain_users",
+            return_value=users,
+        ) as mock_get_domain_users,
+    ):
+        client = mock_client_class.return_value
+        client.bind.return_value = connection
+        client.get_default_naming_context.return_value = (
+            "DC=lab,DC=local"
+        )
+
+        result = run_audit(args)
+
+    assert result == 0
+
+    mock_get_domain_policy.assert_called_once_with(
+        connection,
+        "DC=lab,DC=local",
+    )
+    mock_normalize_domain_policy.assert_called_once_with(
+        {"raw": "policy"}
+    )
+    mock_get_domain_users.assert_called_once_with(
+        connection,
+        "DC=lab,DC=local",
+    )
+
+    connection.unbind.assert_called_once()
+
+
+def test_run_audit_builds_plan_for_each_user():
+    args = argparse.Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
+    )
+
+    connection = MagicMock()
+
+    policy = DomainPolicy(
+        min_password_length=8,
+        password_history_length=24,
+        min_password_age_seconds=0,
+        max_password_age_seconds=3628800,
+        lockout_threshold=0,
+        lockout_duration_seconds=1800,
+        lockout_observation_window_seconds=1800,
+    )
+
+    user = ADUser(
+        distinguished_name="CN=auditor,DC=lab,DC=local",
+        sam_account_name="auditor",
+        sid="S-1-5-21-1111111111-2222222222-3333333333-1103",
+        user_principal_name="auditor@lab.local",
+        enabled=True,
+        lockout_time=0,
+        bad_password_count=0,
+        bad_password_time=None,
+        resultant_pso=None,
+    )
+
+    effective_policy = EffectivePolicy(
+        source="domain",
+        policy=policy,
+    )
+
+    plan = AccountPlan(
+        sam_account_name="auditor",
+        action="assess",
+        reason="safety_assessment_passed",
+    )
+
+    with (
+        patch(
+            "lockoutlens.cli.getpass",
+            return_value="secret",
+        ),
+        patch("lockoutlens.cli.LDAPClient") as mock_client_class,
+        patch(
+            "lockoutlens.cli.get_domain_policy",
+            return_value={"raw": "policy"},
+        ),
+        patch(
+            "lockoutlens.cli.normalize_domain_policy",
+            return_value=policy,
+        ),
+        patch(
+            "lockoutlens.cli.get_domain_users",
+            return_value=[user],
+        ),
+        patch(
+            "lockoutlens.cli.resolve_effective_policy",
+            return_value=effective_policy,
+        ) as mock_resolve_effective_policy,
+        patch(
+            "lockoutlens.cli.audit_account",
+            return_value=plan,
+        ) as mock_audit_account,
+    ):
+        client = mock_client_class.return_value
+        client.bind.return_value = connection
+        client.get_default_naming_context.return_value = (
+            "DC=lab,DC=local"
+        )
+
+        result = run_audit(args)
+
+    assert result == 0
+
+    mock_resolve_effective_policy.assert_called_once_with(
+        connection,
+        user,
+        policy,
+    )
+
+    mock_audit_account.assert_called_once()
+
+    audit_args = mock_audit_account.call_args
+
+    assert audit_args.args[0] == user
+    assert audit_args.args[1] == effective_policy
+    assert "now" in audit_args.kwargs
+
+    connection.unbind.assert_called_once()
+
+
+def test_run_audit_displays_account_plans(capsys):
+    args = argparse.Namespace(
+        dc="dc01.lab.local",
+        domain="lab.local",
+        username="auditor",
+        use_ssl=True,
+        ca_file="/tmp/lab-ca.pem",
+    )
+
+    connection = MagicMock()
+
+    policy = DomainPolicy(
+        min_password_length=8,
+        password_history_length=24,
+        min_password_age_seconds=0,
+        max_password_age_seconds=3628800,
+        lockout_threshold=0,
+        lockout_duration_seconds=1800,
+        lockout_observation_window_seconds=1800,
+    )
+
+    users = [
+        ADUser(
+            distinguished_name="CN=auditor,DC=lab,DC=local",
+            sam_account_name="auditor",
+            sid="S-1-5-21-1-2-3-1103",
+            user_principal_name="auditor@lab.local",
+            enabled=True,
+            lockout_time=0,
+            bad_password_count=0,
+            bad_password_time=None,
+            resultant_pso=None,
+        ),
+        ADUser(
+            distinguished_name="CN=Administrator,DC=lab,DC=local",
+            sam_account_name="Administrator",
+            sid="S-1-5-21-1-2-3-500",
+            user_principal_name=None,
+            enabled=True,
+            lockout_time=0,
+            bad_password_count=0,
+            bad_password_time=None,
+            resultant_pso=None,
+        ),
+    ]
+
+    plans = [
+        AccountPlan(
+            sam_account_name="auditor",
+            action="assess",
+            reason="safety_assessment_passed",
+        ),
+        AccountPlan(
+            sam_account_name="Administrator",
+            action="skip",
+            reason="builtin_administrator",
+        ),
+    ]
+
+    with (
+        patch(
+            "lockoutlens.cli.getpass",
+            return_value="secret",
+        ),
+        patch("lockoutlens.cli.LDAPClient") as mock_client_class,
+        patch(
+            "lockoutlens.cli.get_domain_policy",
+            return_value={"raw": "policy"},
+        ),
+        patch(
+            "lockoutlens.cli.normalize_domain_policy",
+            return_value=policy,
+        ),
+        patch(
+            "lockoutlens.cli.get_domain_users",
+            return_value=users,
+        ),
+        patch(
+            "lockoutlens.cli.resolve_effective_policy",
+            side_effect=[
+                EffectivePolicy(source="domain", policy=policy),
+                EffectivePolicy(source="domain", policy=policy),
+            ],
+        ),
+        patch(
+            "lockoutlens.cli.audit_account",
+            side_effect=plans,
+        ),
+    ):
+        client = mock_client_class.return_value
+        client.bind.return_value = connection
+        client.get_default_naming_context.return_value = (
+            "DC=lab,DC=local"
+        )
+
+        result = run_audit(args)
+
+    assert result == 0
+
+    output = capsys.readouterr().out
+
+    assert "Account Assessment Plan" in output
+    assert "auditor" in output
+    assert "ASSESS" in output
+    assert "safety_assessment_passed" in output
+    assert "Administrator" in output
+    assert "SKIP" in output
+    assert "builtin_administrator" in output
+
+    connection.unbind.assert_called_once()
