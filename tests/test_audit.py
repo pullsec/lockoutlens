@@ -32,7 +32,7 @@ def test_audit_safe_standard_account_is_planned_for_assessment():
         policy=policy,
     )
 
-    plan = audit_account(
+    result = audit_account(
         user,
         effective_policy,
         now=datetime(
@@ -45,9 +45,15 @@ def test_audit_safe_standard_account_is_planned_for_assessment():
         ),
     )
 
-    assert plan.sam_account_name == "auditor"
-    assert plan.action == "assess"
-    assert plan.reason == "safety_assessment_passed"
+    assert result.plan.sam_account_name == "auditor"
+    assert result.plan.action == "assess"
+    assert result.plan.reason == "safety_assessment_passed"
+
+    assert result.assessment.status == "safe"
+    assert result.assessment.reason == "lockout_disabled"
+    assert result.assessment.lockout_enabled is False
+    assert result.assessment.lockout_threshold == 0
+    assert result.assessment.bad_password_count == 0
 
 
 def test_audit_builtin_administrator_is_skipped_even_when_lockout_disabled():
@@ -76,7 +82,7 @@ def test_audit_builtin_administrator_is_skipped_even_when_lockout_disabled():
         policy=policy,
     )
 
-    plan = audit_account(
+    result = audit_account(
         user,
         effective_policy,
         now=datetime(
@@ -89,9 +95,9 @@ def test_audit_builtin_administrator_is_skipped_even_when_lockout_disabled():
         ),
     )
 
-    assert plan.sam_account_name == "renamed-admin"
-    assert plan.action == "skip"
-    assert plan.reason == "builtin_administrator"
+    assert result.plan.sam_account_name == "renamed-admin"
+    assert result.plan.action == "skip"
+    assert result.plan.reason == "builtin_administrator"
 
 
 def test_audit_standard_account_is_skipped_when_locked():
@@ -120,7 +126,7 @@ def test_audit_standard_account_is_skipped_when_locked():
         policy=policy,
     )
 
-    plan = audit_account(
+    result = audit_account(
         user,
         effective_policy,
         now=datetime(
@@ -133,6 +139,6 @@ def test_audit_standard_account_is_skipped_when_locked():
         ),
     )
 
-    assert plan.sam_account_name == "auditor"
-    assert plan.action == "skip"
-    assert plan.reason == "account_locked"
+    assert result.plan.sam_account_name == "auditor"
+    assert result.plan.action == "skip"
+    assert result.plan.reason == "account_locked"

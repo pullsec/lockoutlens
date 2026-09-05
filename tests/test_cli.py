@@ -12,6 +12,8 @@ from lockoutlens.ldap.policy import DomainPolicy
 from lockoutlens.ldap.users import ADUser
 
 from lockoutlens.ldap.effective_policy import EffectivePolicy
+from lockoutlens.audit import AccountAuditResult
+from lockoutlens.safety import LockoutAssessment
 from lockoutlens.planner import AccountPlan
 
 def test_parser_program_name():
@@ -553,6 +555,19 @@ def test_run_audit_builds_plan_for_each_user():
         reason="safety_assessment_passed",
     )
 
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="lockout_disabled",
+        lockout_enabled=False,
+        lockout_threshold=0,
+        bad_password_count=0,
+    )
+
+    audit_result = AccountAuditResult(
+        plan=plan,
+        assessment=assessment,
+    )
+
     with (
         patch(
             "lockoutlens.cli.getpass",
@@ -577,7 +592,7 @@ def test_run_audit_builds_plan_for_each_user():
         ) as mock_resolve_effective_policy,
         patch(
             "lockoutlens.cli.audit_account",
-            return_value=plan,
+            return_value=audit_result,
         ) as mock_audit_account,
     ):
         client = mock_client_class.return_value
@@ -666,6 +681,35 @@ def test_run_audit_displays_account_plans(capsys):
         ),
     ]
 
+    assessments = [
+        LockoutAssessment(
+            status="safe",
+            reason="lockout_disabled",
+            lockout_enabled=False,
+            lockout_threshold=0,
+            bad_password_count=0,
+        ),
+        LockoutAssessment(
+            status="safe",
+            reason="lockout_disabled",
+            lockout_enabled=False,
+            lockout_threshold=0,
+            bad_password_count=0,
+        ),
+    ]
+
+    audit_results = [
+        AccountAuditResult(
+            plan=plan,
+            assessment=assessment,
+        )
+        for plan, assessment in zip(
+            plans,
+            assessments,
+            strict=True,
+        )
+    ]
+
     with (
         patch(
             "lockoutlens.cli.getpass",
@@ -693,7 +737,7 @@ def test_run_audit_displays_account_plans(capsys):
         ),
         patch(
             "lockoutlens.cli.audit_account",
-            side_effect=plans,
+            side_effect=audit_results,
         ),
     ):
         client = mock_client_class.return_value
@@ -712,6 +756,8 @@ def test_run_audit_displays_account_plans(capsys):
     assert "auditor" in output
     assert "ASSESS" in output
     assert "safety_assessment_passed" in output
+    assert "SAFE" in output
+    assert "lockout_disabled" in output
     assert "Administrator" in output
     assert "SKIP" in output
     assert "builtin_administrator" in output
@@ -858,6 +904,35 @@ def test_run_audit_displays_effective_policy_source(capsys):
         ),
     ]
 
+    assessments = [
+        LockoutAssessment(
+            status="safe",
+            reason="lockout_disabled",
+            lockout_enabled=False,
+            lockout_threshold=0,
+            bad_password_count=0,
+        ),
+        LockoutAssessment(
+            status="safe",
+            reason="no_bad_passwords",
+            lockout_enabled=True,
+            lockout_threshold=5,
+            bad_password_count=0,
+        ),
+    ]
+
+    audit_results = [
+         AccountAuditResult(
+            plan=plan,
+            assessment=assessment,
+        )
+    for plan, assessment in zip(
+        plans,
+        assessments,
+        strict=True,
+    )
+]
+
     with (
         patch("lockoutlens.cli.getpass", return_value="secret"),
         patch("lockoutlens.cli.LDAPClient") as mock_client_class,
@@ -879,7 +954,7 @@ def test_run_audit_displays_effective_policy_source(capsys):
         ),
         patch(
             "lockoutlens.cli.audit_account",
-            side_effect=plans,
+            side_effect=audit_results,
         ),
     ):
         client = mock_client_class.return_value

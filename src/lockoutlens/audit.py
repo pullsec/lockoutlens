@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime
 
 from lockoutlens.classification import classify_account
@@ -5,7 +6,15 @@ from lockoutlens.eligibility import assess_account_eligibility
 from lockoutlens.ldap.effective_policy import EffectivePolicy
 from lockoutlens.ldap.users import ADUser
 from lockoutlens.planner import AccountPlan, plan_account
-from lockoutlens.safety import assess_lockout_risk
+from lockoutlens.safety import LockoutAssessment, assess_lockout_risk
+
+
+@dataclass(frozen=True)
+class AccountAuditResult:
+    """Dry-run audit result for an Active Directory account."""
+
+    plan: AccountPlan
+    assessment: LockoutAssessment
 
 
 def audit_account(
@@ -13,7 +22,7 @@ def audit_account(
     effective_policy: EffectivePolicy,
     *,
     now: datetime,
-) -> AccountPlan:
+) -> AccountAuditResult:
     """Build a dry-run assessment plan for an Active Directory account."""
     classification = classify_account(user)
 
@@ -28,7 +37,12 @@ def audit_account(
         classification,
     )
 
-    return plan_account(
+    plan = plan_account(
         user,
         eligibility,
+    )
+
+    return AccountAuditResult(
+        plan=plan,
+        assessment=assessment,
     )
