@@ -226,6 +226,7 @@ def run_audit(args: argparse.Namespace) -> int:
         now = datetime.now(timezone.utc)
 
         plans = []
+        policy_sources = []
 
         for user in users:
             effective_policy = resolve_effective_policy(
@@ -241,6 +242,7 @@ def run_audit(args: argparse.Namespace) -> int:
             )
 
             plans.append(plan)
+            policy_sources.append(effective_policy.source)
 
     except (LDAPBindError, LDAPError) as exc:
         print(f"Error: {exc}")
@@ -253,9 +255,14 @@ def run_audit(args: argparse.Namespace) -> int:
     print("Account Assessment Plan")
     print("-" * 60)
 
-    for plan in plans:
+    for plan, policy_source in zip(
+        plans,
+        policy_sources,
+        strict=True,
+    ):
         print(
             f"{plan.sam_account_name:<24} "
+            f"{policy_source.upper():<8} "
             f"{plan.action.upper():<8} "
             f"{plan.reason}"
         )
