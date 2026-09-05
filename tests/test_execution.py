@@ -50,6 +50,8 @@ def test_safe_lockout_assessment_allows_attempt():
     decision = authorize_attempt(
         assessment,
         eligibility,
+        attempts_for_account=0,
+        max_attempts_per_account=1,
     )
 
     assert decision.allowed is True
@@ -92,3 +94,125 @@ def test_missing_eligibility_blocks_attempt():
 
     assert decision.allowed is False
     assert decision.reason == "eligibility_unknown"
+
+
+def test_exhausted_account_attempt_budget_blocks_attempt():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+        attempts_for_account=1,
+        max_attempts_per_account=1,
+    )
+
+    assert decision.allowed is False
+    assert decision.reason == "account_attempt_limit_reached"
+
+
+def test_missing_attempt_budget_blocks_attempt():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+    )
+
+    assert decision.allowed is False
+    assert decision.reason == "attempt_budget_unknown"
+
+
+def test_negative_account_attempt_count_blocks_attempt():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+        attempts_for_account=-1,
+        max_attempts_per_account=1,
+    )
+
+    assert decision.allowed is False
+    assert decision.reason == "invalid_attempt_budget"
+
+def test_zero_account_attempt_limit_blocks_attempt_as_invalid():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+        attempts_for_account=0,
+        max_attempts_per_account=0,
+    )
+
+    assert decision.allowed is False
+    assert decision.reason == "invalid_attempt_budget"
+
+
+def test_negative_account_attempt_limit_blocks_attempt_as_invalid():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+        attempts_for_account=0,
+        max_attempts_per_account=-1,
+    )
+
+    assert decision.allowed is False
+    assert decision.reason == "invalid_attempt_budget"

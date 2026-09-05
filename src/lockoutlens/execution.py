@@ -11,12 +11,14 @@ class ExecutionDecision:
     allowed: bool
     reason: str
 
-
 def authorize_attempt(
     assessment: LockoutAssessment,
     eligibility: AccountEligibility | None = None,
+    *,
+    attempts_for_account: int | None = None,
+    max_attempts_per_account: int | None = None,
 ) -> ExecutionDecision:
-    """Authorize an attempt only when lockout risk is known to be safe."""
+    """Authorize an attempt only when all execution safety gates pass."""
     if assessment.status == "unknown":
         return ExecutionDecision(
             allowed=False,
@@ -39,6 +41,30 @@ def authorize_attempt(
         return ExecutionDecision(
             allowed=False,
             reason=eligibility.reason,
+        )
+
+    if (
+        attempts_for_account is None
+        or max_attempts_per_account is None
+    ):
+        return ExecutionDecision(
+            allowed=False,
+            reason="attempt_budget_unknown",
+        )
+
+    if (
+        attempts_for_account < 0
+        or max_attempts_per_account <= 0
+    ):
+        return ExecutionDecision(
+            allowed=False,
+            reason="invalid_attempt_budget",
+        )
+
+    if attempts_for_account >= max_attempts_per_account:
+        return ExecutionDecision(
+            allowed=False,
+            reason="account_attempt_limit_reached",
         )
 
     return ExecutionDecision(
