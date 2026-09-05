@@ -39,6 +39,23 @@ class ADUser:
         """Return whether Active Directory reports a lockout time."""
         return self.lockout_time > 0
 
+    @property
+    def rid(self) -> int:
+        """Return the relative identifier from the account SID."""
+        parts = self.sid.rsplit("-", 1)
+
+        if len(parts) != 2:
+            raise ValueError(
+                f"Invalid Active Directory SID: {self.sid!r}"
+            )
+
+        try:
+            return int(parts[1])
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid Active Directory SID: {self.sid!r}"
+            ) from exc
+
 
 def is_account_enabled(user_account_control: int | str) -> bool:
     """Return whether an Active Directory account is enabled."""

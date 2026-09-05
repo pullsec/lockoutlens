@@ -360,3 +360,39 @@ def test_normalize_ad_user_with_resultant_pso():
         "CN=StrictPolicy,CN=Password Settings Container,"
         "CN=System,DC=lab,DC=local"
     )
+
+
+def test_ad_user_rid_is_derived_from_sid():
+    user = ADUser(
+        distinguished_name="CN=test,DC=lab,DC=local",
+        sam_account_name="test",
+        sid="S-1-5-21-1111111111-2222222222-3333333333-1103",
+        user_principal_name="test@lab.local",
+        enabled=True,
+        lockout_time=0,
+        bad_password_count=0,
+        bad_password_time=None,
+        resultant_pso=None,
+    )
+
+    assert user.rid == 1103
+
+
+def test_ad_user_rid_rejects_invalid_sid():
+    user = ADUser(
+        distinguished_name="CN=test,DC=lab,DC=local",
+        sam_account_name="test",
+        sid="invalid",
+        user_principal_name="test@lab.local",
+        enabled=True,
+        lockout_time=0,
+        bad_password_count=0,
+        bad_password_time=None,
+        resultant_pso=None,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid Active Directory SID",
+    ):
+        _ = user.rid
