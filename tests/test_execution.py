@@ -349,3 +349,83 @@ def test_negative_global_attempt_limit_blocks_attempt_as_invalid():
 
     assert decision.allowed is False
     assert decision.reason == "invalid_global_attempt_budget"
+
+def test_attempt_budget_tracks_account_and_global_limits():
+    from lockoutlens.execution import AttemptBudget
+
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=0,
+        max_total_attempts=10,
+    )
+
+    assert budget.attempts_for_account == 0
+    assert budget.max_attempts_per_account == 1
+    assert budget.total_attempts == 0
+    assert budget.max_total_attempts == 10
+
+def test_authorize_attempt_accepts_attempt_budget():
+    from lockoutlens.execution import AttemptBudget
+
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=0,
+        max_total_attempts=10,
+    )
+
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+        budget=budget,
+    )
+
+    assert decision.allowed is True
+    assert decision.reason == "lockout_assessment_safe"
+
+def test_attempt_budget_conflicts_with_legacy_budget_arguments():
+    from lockoutlens.execution import AttemptBudget
+
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=0,
+        max_total_attempts=10,
+    )
+
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+        attempts_for_account=0,
+        budget=budget,
+    )
+
+    assert decision.allowed is False
+    assert decision.reason == "conflicting_attempt_budget"

@@ -5,6 +5,16 @@ from lockoutlens.eligibility import AccountEligibility
 
 
 @dataclass(frozen=True)
+class AttemptBudget:
+    """Attempt limits and counters for an execution campaign."""
+
+    attempts_for_account: int
+    max_attempts_per_account: int
+    total_attempts: int
+    max_total_attempts: int
+
+
+@dataclass(frozen=True)
 class ExecutionDecision:
     """Decision controlling whether an authentication attempt is allowed."""
 
@@ -20,8 +30,29 @@ def authorize_attempt(
     max_attempts_per_account: int | None = None,
     total_attempts: int | None = None,
     max_total_attempts: int | None = None,
+    budget: AttemptBudget | None = None,
 ) -> ExecutionDecision:
     """Authorize an attempt only when all execution safety gates pass."""
+    if budget is not None and any(
+        value is not None
+        for value in (
+            attempts_for_account,
+            max_attempts_per_account,
+            total_attempts,
+            max_total_attempts,
+        )
+    ):
+        return ExecutionDecision(
+            allowed=False,
+            reason="conflicting_attempt_budget",
+        )
+
+    if budget is not None:
+        attempts_for_account = budget.attempts_for_account
+        max_attempts_per_account = budget.max_attempts_per_account
+        total_attempts = budget.total_attempts
+        max_total_attempts = budget.max_total_attempts
+
     if assessment.status == "unknown":
         return ExecutionDecision(
             allowed=False,
