@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
 from lockoutlens.safety import LockoutAssessment
+from lockoutlens.classification import AccountClassification
+
 
 EligibilityStatus = Literal[
     "eligible",
@@ -23,8 +25,15 @@ class AccountEligibility:
 
 def assess_account_eligibility(
     assessment: LockoutAssessment,
+    classification: AccountClassification,
 ) -> AccountEligibility:
     """Assess whether an account is eligible for planning."""
+    if classification.kind != "standard":
+        return AccountEligibility(
+            status="ineligible",
+            reason=classification.kind,
+        )
+
     if assessment.safe:
         return AccountEligibility(
             status="eligible",
