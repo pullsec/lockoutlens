@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from lockoutlens.safety import LockoutAssessment
 from lockoutlens.eligibility import AccountEligibility
 
+class AuthenticationError(Exception):
+    """Raised when an authentication attempt cannot produce a reliable result."""
 
 @dataclass(frozen=True)
 class AttemptBudget:
@@ -175,7 +177,17 @@ def execute_attempt(
             budget,
         )
 
-    authenticated = authenticator(username)
+    try:
+        authenticated = authenticator(username)
+    except AuthenticationError as exc:
+        return (
+            ExecutionResult(
+                status="error",
+                username=username,
+                reason=str(exc),
+            ),
+            budget,
+        )
 
     if authenticated:
         return (

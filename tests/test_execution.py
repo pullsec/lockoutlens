@@ -1,8 +1,10 @@
+import pytest
 #from lockoutlens.execution import authorize_attempt
 #from lockoutlens.execution import AttemptBudget, consume_attempt
 
 from lockoutlens.execution import (
     AttemptBudget,
+    AuthenticationError,
     ExecutionResult,
     authorize_attempt,
     consume_attempt,
@@ -607,3 +609,78 @@ def test_execute_attempt_consumes_budget_when_authentication_fails():
         total_attempts=3,
         max_total_attempts=10,
     )
+
+
+def test_execute_attempt_reports_authentication_error_without_consuming_budget():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=2,
+        max_total_attempts=10,
+    )
+
+    def authenticator(username: str) -> bool:
+        raise AuthenticationError("connection_failed")
+
+    result, updated_budget = execute_attempt(
+        username="alice",
+        assessment=assessment,
+        eligibility=eligibility,
+        budget=budget,
+        authenticator=authenticator,
+    )
+
+    assert result == ExecutionResult(
+        status="error",
+        username="alice",
+        reason="connection_failed",
+    )
+    assert updated_budget == budget
+
+
+
+def test_execute_attempt_does_not_swallow_unexpected_authenticator_errors():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=0,
+        max_total_attempts=10,
+    )
+
+    def authenticator(username: str) -> bool:
+        raise RuntimeError("unexpected_bug")
+
+    with pytest.raises(RuntimeError, match="unexpected_bug"):
+        execute_attempt(
+            username="alice",
+            assessment=assessment,
+            eligibility=eligibility,
+            budget=budget,
+            authenticator=authenticator,
+        )
