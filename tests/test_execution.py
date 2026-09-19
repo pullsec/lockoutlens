@@ -1,7 +1,9 @@
 #from lockoutlens.execution import authorize_attempt
 #from lockoutlens.execution import AttemptBudget, consume_attempt
+
 from lockoutlens.execution import (
     AttemptBudget,
+    ExecutionResult,
     authorize_attempt,
     consume_attempt,
 )
@@ -452,3 +454,15 @@ def test_consume_attempt_increments_account_and_global_counters():
     assert updated_budget.max_attempts_per_account == 1
     assert updated_budget.total_attempts == 3
     assert updated_budget.max_total_attempts == 10
+
+
+def test_execution_result_tracks_attempt_outcome():
+    result = ExecutionResult(
+        status="success",
+        username="alice",
+        reason="authentication_succeeded",
+    )
+
+    assert result.status == "success"
+    assert result.username == "alice"
+    assert result.reason == "authentication_succeeded"

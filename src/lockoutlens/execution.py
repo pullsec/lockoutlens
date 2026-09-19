@@ -32,6 +32,15 @@ class ExecutionDecision:
     reason: str
 
 
+@dataclass(frozen=True)
+class ExecutionResult:
+    """Result of an authentication attempt."""
+
+    status: str
+    username: str
+    reason: str
+
+
 def authorize_attempt(
     assessment: LockoutAssessment,
     eligibility: AccountEligibility | None = None,
