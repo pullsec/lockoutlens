@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from lockoutlens.safety import LockoutAssessment
 from lockoutlens.eligibility import AccountEligibility
 
+from lockoutlens.exceptions import AuthenticationError
 
 @dataclass(frozen=True)
 class AttemptBudget:
@@ -14,11 +15,30 @@ class AttemptBudget:
     max_total_attempts: int
 
 
+def consume_attempt(budget: AttemptBudget) -> AttemptBudget:
+    """Return a new budget with one account and global attempt consumed."""
+    return AttemptBudget(
+        attempts_for_account=budget.attempts_for_account + 1,
+        max_attempts_per_account=budget.max_attempts_per_account,
+        total_attempts=budget.total_attempts + 1,
+        max_total_attempts=budget.max_total_attempts,
+    )
+
+
 @dataclass(frozen=True)
 class ExecutionDecision:
     """Decision controlling whether an authentication attempt is allowed."""
 
     allowed: bool
+    reason: str
+
+
+@dataclass(frozen=True)
+class ExecutionResult:
+    """Result of an authentication attempt."""
+
+    status: str
+    username: str
     reason: str
 
 
@@ -128,4 +148,61 @@ def authorize_attempt(
     return ExecutionDecision(
         allowed=True,
         reason="lockout_assessment_safe",
+    )
+
+
+def execute_attempt(
+    *,
+    username: str,
+    assessment: LockoutAssessment,
+    eligibility: AccountEligibility,
+    budget: AttemptBudget,
+    authenticator,
+) -> tuple[ExecutionResult, AttemptBudget]:
+    """Execute an authentication attempt only when authorization allows it."""
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+        budget=budget,
+    )
+
+    if not decision.allowed:
+        return (
+            ExecutionResult(
+                status="skipped",
+                username=username,
+                reason=decision.reason,
+            ),
+            budget,
+        )
+
+    try:
+        authenticated = authenticator(username)
+    except AuthenticationError as exc:
+        return (
+            ExecutionResult(
+                status="error",
+                username=username,
+                reason=str(exc),
+            ),
+            budget,
+        )
+
+    if authenticated:
+        return (
+            ExecutionResult(
+                status="success",
+                username=username,
+                reason="authentication_succeeded",
+            ),
+            consume_attempt(budget),
+        )
+
+    return (
+        ExecutionResult(
+            status="failure",
+            username=username,
+            reason="authentication_failed",
+        ),
+        consume_attempt(budget),
     )
