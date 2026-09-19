@@ -5,12 +5,6 @@
   <img src="https://img.shields.io/github/license/pullsec/lockoutlens?style=for-the-badge" />
 </p>
 
-<h1 align="center">LockoutLens</h1>
-
-<p align="center">
-  Safety-oriented Active Directory lockout assessment and controlled authentication execution.
-</p>
-
 <p align="center">
   <a href="https://github.com/pullsec/lockoutlens">Repository</a> ·
   <a href="https://github.com/pullsec/lockoutlens/issues">Report Bug</a> ·
