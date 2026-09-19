@@ -14,6 +14,16 @@ class AttemptBudget:
     max_total_attempts: int
 
 
+def consume_attempt(budget: AttemptBudget) -> AttemptBudget:
+    """Return a new budget with one account and global attempt consumed."""
+    return AttemptBudget(
+        attempts_for_account=budget.attempts_for_account + 1,
+        max_attempts_per_account=budget.max_attempts_per_account,
+        total_attempts=budget.total_attempts + 1,
+        max_total_attempts=budget.max_total_attempts,
+    )
+
+
 @dataclass(frozen=True)
 class ExecutionDecision:
     """Decision controlling whether an authentication attempt is allowed."""

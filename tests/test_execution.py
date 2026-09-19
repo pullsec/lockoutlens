@@ -1,4 +1,11 @@
-from lockoutlens.execution import authorize_attempt
+#from lockoutlens.execution import authorize_attempt
+#from lockoutlens.execution import AttemptBudget, consume_attempt
+from lockoutlens.execution import (
+    AttemptBudget,
+    authorize_attempt,
+    consume_attempt,
+)
+
 from lockoutlens.safety import LockoutAssessment
 from lockoutlens.eligibility import AccountEligibility
 
@@ -429,3 +436,19 @@ def test_attempt_budget_conflicts_with_legacy_budget_arguments():
 
     assert decision.allowed is False
     assert decision.reason == "conflicting_attempt_budget"
+
+
+def test_consume_attempt_increments_account_and_global_counters():
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=2,
+        max_total_attempts=10,
+    )
+
+    updated_budget = consume_attempt(budget)
+
+    assert updated_budget.attempts_for_account == 1
+    assert updated_budget.max_attempts_per_account == 1
+    assert updated_budget.total_attempts == 3
+    assert updated_budget.max_total_attempts == 10
