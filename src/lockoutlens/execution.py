@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from lockoutlens.safety import LockoutAssessment
 from lockoutlens.eligibility import AccountEligibility
 
-class AuthenticationError(Exception):
-    """Raised when an authentication attempt cannot produce a reliable result."""
+from lockoutlens.exceptions import AuthenticationError
 
 @dataclass(frozen=True)
 class AttemptBudget:
