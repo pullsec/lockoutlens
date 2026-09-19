@@ -1,4 +1,4 @@
-<align="center">
+<p align="center">
   <img src="https://img.shields.io/badge/status-development-orange?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/Active%20Directory-LDAP-blue?style=for-the-badge" />
