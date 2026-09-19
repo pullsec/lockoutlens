@@ -6,6 +6,7 @@ from lockoutlens.execution import (
     ExecutionResult,
     authorize_attempt,
     consume_attempt,
+    execute_attempt,
 )
 
 from lockoutlens.safety import LockoutAssessment
@@ -466,3 +467,143 @@ def test_execution_result_tracks_attempt_outcome():
     assert result.status == "success"
     assert result.username == "alice"
     assert result.reason == "authentication_succeeded"
+
+
+def test_execute_attempt_skips_authentication_when_not_authorized():
+    assessment = LockoutAssessment(
+        status="unsafe",
+        reason="account_locked",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=2,
+    )
+
+    eligibility = AccountEligibility(
+        status="ineligible",
+        reason="lockout_assessment_failed",
+    )
+
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=0,
+        max_total_attempts=10,
+    )
+
+    authenticator_called = False
+
+    def authenticator(username: str) -> bool:
+        nonlocal authenticator_called
+        authenticator_called = True
+        return True
+
+    result, updated_budget = execute_attempt(
+        username="alice",
+        assessment=assessment,
+        eligibility=eligibility,
+        budget=budget,
+        authenticator=authenticator,
+    )
+
+    assert result == ExecutionResult(
+        status="skipped",
+        username="alice",
+        reason="account_locked",
+    )
+    assert updated_budget == budget
+    assert authenticator_called is False
+
+
+def test_execute_attempt_authenticates_and_consumes_budget_when_authorized():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=2,
+        max_total_attempts=10,
+    )
+
+    authenticated_username = None
+
+    def authenticator(username: str) -> bool:
+        nonlocal authenticated_username
+        authenticated_username = username
+        return True
+
+    result, updated_budget = execute_attempt(
+        username="alice",
+        assessment=assessment,
+        eligibility=eligibility,
+        budget=budget,
+        authenticator=authenticator,
+    )
+
+    assert result == ExecutionResult(
+        status="success",
+        username="alice",
+        reason="authentication_succeeded",
+    )
+    assert authenticated_username == "alice"
+    assert updated_budget == AttemptBudget(
+        attempts_for_account=1,
+        max_attempts_per_account=1,
+        total_attempts=3,
+        max_total_attempts=10,
+    )
+
+
+def test_execute_attempt_consumes_budget_when_authentication_fails():
+    assessment = LockoutAssessment(
+        status="safe",
+        reason="no_bad_passwords",
+        lockout_enabled=True,
+        lockout_threshold=5,
+        bad_password_count=0,
+    )
+
+    eligibility = AccountEligibility(
+        status="eligible",
+        reason="safety_assessment_passed",
+    )
+
+    budget = AttemptBudget(
+        attempts_for_account=0,
+        max_attempts_per_account=1,
+        total_attempts=2,
+        max_total_attempts=10,
+    )
+
+    def authenticator(username: str) -> bool:
+        return False
+
+    result, updated_budget = execute_attempt(
+        username="alice",
+        assessment=assessment,
+        eligibility=eligibility,
+        budget=budget,
+        authenticator=authenticator,
+    )
+
+    assert result == ExecutionResult(
+        status="failure",
+        username="alice",
+        reason="authentication_failed",
+    )
+    assert updated_budget == AttemptBudget(
+        attempts_for_account=1,
+        max_attempts_per_account=1,
+        total_attempts=3,
+        max_total_attempts=10,
+    )

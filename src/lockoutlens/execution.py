@@ -148,3 +148,50 @@ def authorize_attempt(
         allowed=True,
         reason="lockout_assessment_safe",
     )
+
+
+def execute_attempt(
+    *,
+    username: str,
+    assessment: LockoutAssessment,
+    eligibility: AccountEligibility,
+    budget: AttemptBudget,
+    authenticator,
+) -> tuple[ExecutionResult, AttemptBudget]:
+    """Execute an authentication attempt only when authorization allows it."""
+    decision = authorize_attempt(
+        assessment,
+        eligibility,
+        budget=budget,
+    )
+
+    if not decision.allowed:
+        return (
+            ExecutionResult(
+                status="skipped",
+                username=username,
+                reason=decision.reason,
+            ),
+            budget,
+        )
+
+    authenticated = authenticator(username)
+
+    if authenticated:
+        return (
+            ExecutionResult(
+                status="success",
+                username=username,
+                reason="authentication_succeeded",
+            ),
+            consume_attempt(budget),
+        )
+
+    return (
+        ExecutionResult(
+            status="failure",
+            username=username,
+            reason="authentication_failed",
+        ),
+        consume_attempt(budget),
+    )
